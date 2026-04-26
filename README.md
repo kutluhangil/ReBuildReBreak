@@ -149,6 +149,47 @@ Uygulama `http://localhost:3000` adresinde çalışır.
 
 ---
 
+## Vercel ile Deployment (Canlıya Alma)
+
+Vercel, React ve Vite projelerini canlıya almak için en hızlı ve ücretsiz platformlardan biridir. Bu projeyi kendi Vercel hesabınızda canlıya almak için aşağıdaki adımları izleyin:
+
+### Gereksinimler
+
+1.  Bir [GitHub](https://github.com/) hesabı.
+2.  Bir [Vercel](https://vercel.com/) hesabı (GitHub hesabınızla giriş yapabilirsiniz).
+3.  Gemini API Anahtarı (Yapay zeka üretim özelliği için).
+
+### Adım Adım Deployment
+
+**Adım 1: Projeyi GitHub'a Yükleyin**
+Eğer projeyi henüz kendi GitHub hesabınıza yüklemediyseniz, kodları indirip kendi hesabınızda yeni bir repository (depo) oluşturarak yükleyin.
+
+**Adım 2: Vercel'e İçe Aktarın**
+1. Vercel paneline giriş yapın.
+2. Sağ üstteki **"Add New"** > **"Project"** butonuna tıklayın.
+3. GitHub hesabınızı Vercel'e bağlayın.
+4. Yüklediğiniz `rebuild-rebreak` (veya kendi adlandırdığınız) projesini bulun ve **"Import"** butonuna tıklayın.
+
+**Adım 3: Yapılandırma ve Environment Variables (Ortam Değişkenleri)**
+1.  **Project Name:** Projenizin URL'sinde yer alacak ismi belirleyin (örn: `rebuild-rebreak-app`).
+2.  **Framework Preset:** Vercel otomatik olarak **"Vite"**ı seçecektir. Seçmediyse manuel olarak Vite'ı seçin.
+3.  **Environment Variables (En Önemli Adım):**
+    "Environment Variables" bölümünü genişletin ve aşağıdaki değişkeni ekleyin:
+    *   **Name:** `VITE_GEMINI_API_KEY`
+    *   **Value:** `sizin_gemini_api_anahtariniz_buraya`
+    *   *Add (Ekle)* butonuna basmayı unutmayın.
+
+**Adım 4: Deploy**
+1. **"Deploy"** butonuna tıklayın.
+2. Vercel projenizi derleyecek (build) ve canlıya alacaktır. Bu işlem genellikle 1-2 dakika sürer.
+3. Tebrikler! Ekranda beliren URL'ye tıklayarak uygulamanıza canlı ortamda erişebilirsiniz.
+
+### Güncellemeler (Sürekli Entegrasyon)
+
+Artık GitHub deponuzdaki `main` branch'ine yapacağınız her "push" işlemi, Vercel tarafından otomatik olarak algılanacak ve uygulamanızın yeni versiyonu saniyeler içinde canlıya alınacaktır.
+
+---
+
 ## Lisans
 
 Bu proje [MIT Lisansı](LICENSE) altında dağıtılmaktadır.

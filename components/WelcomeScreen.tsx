@@ -5,12 +5,23 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { Play, Sparkles, Box, Wand2, Orbit } from 'lucide-react';
+import { Play, Sparkles, Box, Wand2, Orbit, Bird, Cat, Rabbit, Hammer } from 'lucide-react';
 
 interface WelcomeScreenProps {
   visible: boolean;
   onDismiss: () => void;
 }
+
+const cardContent = [
+    { icon: <Bird size={24} className="text-emerald-500" />, title: "Eagle", color: "bg-emerald-100" },
+    { icon: <Cat size={24} className="text-amber-500" />, title: "Cat", color: "bg-amber-100" },
+    { icon: <Box size={24} className="text-indigo-500" />, title: "Custom", color: "bg-indigo-100" },
+    { icon: <Rabbit size={24} className="text-rose-500" />, title: "Rabbit", color: "bg-rose-100" },
+    { icon: <Wand2 size={24} className="text-purple-500" />, title: "AI Gen", color: "bg-purple-100" },
+    { icon: <Bird size={24} className="text-sky-500" />, title: "Bird", color: "bg-sky-100" },
+    { icon: <Hammer size={24} className="text-slate-500" />, title: "Tools", color: "bg-slate-100" },
+    { icon: <Cat size={24} className="text-orange-500" />, title: "Twins", color: "bg-orange-100" }
+];
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss }) => {
   const [mounted, setMounted] = useState(false);
@@ -90,49 +101,73 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
 
             <button 
               onClick={onDismiss}
-              className="mt-4 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-indigo-600 transition-all hover:shadow-2xl hover:shadow-indigo-500/30 hover:-translate-y-1 active:translate-y-0 flex items-center gap-3 group"
+              className="relative mt-4 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-indigo-600 transition-all duration-300 hover:shadow-[0_0_40px_-10px_rgba(79,70,229,0.5)] hover:-translate-y-1 active:translate-y-0 flex items-center gap-3 group overflow-hidden border border-slate-800 hover:border-indigo-400"
             >
-              Start Creating
-              <Play fill="currentColor" size={18} className="group-hover:translate-x-1 transition-transform" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+              <span className="relative z-10">Start Creating</span>
+              <Play fill="currentColor" size={18} className="relative z-10 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
           {/* Right Side: Demo Visual */}
-          <div className="flex-1 w-full max-w-md aspect-square relative perspective-1000">
-             <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-white rounded-full shadow-2xl border-4 border-white/50 overflow-hidden flex items-center justify-center">
-                {/* CSS 3D Voxel Demo Box */}
-                <div className="relative w-32 h-32 transform-style-3d animate-[spin-slow_12s_linear_infinite]">
-                    {/* The core box */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-rose-500 opacity-90 shadow-[0_0_40px_rgba(79,70,229,0.5)] transform-style-3d rounded-xl">
-                        {/* Smaller hovering bits to simulate voxels breaking/building */}
-                        {[...Array(6)].map((_, i) => (
+          <div className="flex-1 w-full max-w-md aspect-square relative perspective-[1200px] flex items-center justify-center">
+             <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200/50 rounded-[3rem] shadow-2xl border-4 border-white/60 overflow-hidden flex items-center justify-center">
+                
+                {/* Central glowing core */}
+                <div className="absolute w-28 h-28 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-3xl shadow-[0_0_80px_rgba(79,70,229,0.5)] animate-pulse border border-white/20 flex items-center justify-center transform-style-3d" style={{ animationDuration: '4s' }}>
+                   <div className="w-16 h-16 bg-white/20 rounded-xl backdrop-blur-sm border border-white/30 animate-[spin-slow_8s_linear_infinite]" />
+                </div>
+
+                {/* Orbiting Cards */}
+                <div className="relative w-full h-full transform-style-3d animate-[spin-slow_24s_linear_infinite]">
+                    {cardContent.map((card, i) => {
+                        return (
                            <div 
                              key={i} 
-                             className="absolute w-8 h-8 bg-white/80 rounded-md backdrop-blur-sm border border-white/40 shadow-sm"
+                             className="absolute top-1/2 left-1/2 transform-style-3d"
                              style={{
-                               top: `${Math.random() * 100}%`,
-                               left: `${Math.random() * 100}%`,
-                               transform: `translateZ(${50 + Math.random() * 100}px) rotateX(${Math.random() * 360}deg) rotateY(${Math.random() * 360}deg)`,
-                               animation: `float-slow ${3 + Math.random() * 3}s ease-in-out infinite alternate`
+                               transform: `rotateY(${i * 45}deg) translateZ(160px) rotateX(15deg)`,
                              }}
-                           />
-                        ))}
-                    </div>
+                           >
+                             <div 
+                               className="w-24 h-32 bg-white/80 rounded-2xl backdrop-blur-xl border-2 border-white/80 shadow-2xl flex flex-col items-center p-3 gap-2 -ml-12 -mt-16"
+                               style={{
+                                 animation: `float-card ${3 + i%2}s ease-in-out infinite alternate`,
+                                 animationDelay: `${i * 0.4}s`,
+                               }}
+                             >
+                                <div className={`w-full flex-1 rounded-xl ${card.color} shadow-inner flex flex-col items-center justify-center border border-white/50`}>
+                                    {card.icon}
+                                </div>
+                                <div className="w-full flex flex-col gap-1.5 mt-1 items-center">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</span>
+                                    <div className="flex gap-1">
+                                      <div className="h-1 w-6 bg-slate-200 rounded-full" />
+                                      <div className="h-1 w-3 bg-slate-200 rounded-full" />
+                                    </div>
+                                </div>
+                             </div>
+                           </div>
+                        )
+                    })}
                 </div>
              </div>
           </div>
 
       </div>
       <style>{`
-        .perspective-1000 { perspective: 1000px; }
+        .perspective-\\[1200px\\] { perspective: 1200px; }
         .transform-style-3d { transform-style: preserve-3d; }
         @keyframes spin-slow {
-          from { transform: rotateX(20deg) rotateY(0deg); }
-          to { transform: rotateX(20deg) rotateY(360deg); }
+          from { transform: rotateX(-15deg) rotateY(0deg); }
+          to { transform: rotateX(-15deg) rotateY(360deg); }
         }
-        @keyframes float-slow {
-          from { transform: translateY(0px) translateZ(80px) rotate(0deg); }
-          to { transform: translateY(-30px) translateZ(120px) rotate(45deg); }
+        @keyframes float-card {
+          from { transform: translateY(-10px) rotateZ(-3deg); }
+          to { transform: translateY(10px) rotateZ(3deg); }
+        }
+        @keyframes shimmer {
+          100% { transform: translateX(100%); }
         }
       `}</style>
     </div>

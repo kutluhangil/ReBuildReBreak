@@ -56,7 +56,10 @@ export class VoxelEngine {
   private bounceGizmo: THREE.ArrowHelper;
   private frictionGizmo: THREE.ArrowHelper;
   
-  private onInteraction: () => void;
+  private highlightBox: THREE.Mesh;
+  private previewVoxel: THREE.Mesh;
+  
+  private onInteraction: (action?: string) => void;
 
   public physicsConfig: PhysicsConfig = {
       gravity: -14.0,
@@ -69,7 +72,7 @@ export class VoxelEngine {
     container: HTMLElement, 
     onStateChange: (state: AppState) => void,
     onCountChange: (count: number) => void,
-    onInteraction: () => void = () => {}
+    onInteraction: (action?: string) => void = () => {}
   ) {
     this.container = container;
     this.onStateChange = onStateChange;
@@ -78,8 +81,39 @@ export class VoxelEngine {
 
     // Init Three.js
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(CONFIG.BG_COLOR);
-    this.scene.fog = new THREE.Fog(CONFIG.BG_COLOR, 60, 140); // Reduced haze
+    
+    // Skybox
+    const vertexShader = `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+    const fragmentShader = `
+      uniform vec3 topColor;
+      uniform vec3 bottomColor;
+      varying vec3 vWorldPosition;
+      void main() {
+        float h = normalize(vWorldPosition).y;
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(h, 0.0)), 1.0);
+      }
+    `;
+    const uniforms = {
+      topColor: { value: new THREE.Color(0x87CEEB) }, // Sky blue
+      bottomColor: { value: new THREE.Color(0xE0F7FA) } // Light cyan/white
+    };
+    const skyGeo = new THREE.SphereGeometry(500, 32, 15);
+    const skyMat = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms,
+      side: THREE.BackSide
+    });
+    const sky = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(sky);
+    this.scene.fog = new THREE.Fog(0xE0F7FA, 60, 140); // Match bottom color
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     // Slightly zoomed out start position
@@ -104,6 +138,26 @@ export class VoxelEngine {
     this.scene.add(this.bounceGizmo);
     this.frictionGizmo = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(-12, CONFIG.FLOOR_Y + 0.5, -15), 5, 0x0000ff, 1.5, 1);
     this.scene.add(this.frictionGizmo);
+
+    // Highlight and Preview Box
+    const boxGeo = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
+    
+    // Highlight Box (Outline)
+    const edges = new THREE.EdgesGeometry(boxGeo);
+    this.highlightBox = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2, transparent: true, opacity: 0.8 })
+    ) as unknown as THREE.Mesh; // cast for typing
+    this.highlightBox.visible = false;
+    this.scene.add(this.highlightBox);
+
+    // Add Preview Voxel
+    this.previewVoxel = new THREE.Mesh(
+      boxGeo,
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+    );
+    this.previewVoxel.visible = false;
+    this.scene.add(this.previewVoxel);
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -133,12 +187,90 @@ export class VoxelEngine {
     
     // Interaction listener
     this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown.bind(this));
+    this.renderer.domElement.addEventListener('pointermove', this.onPointerMove.bind(this));
   }
 
   private gridSnapping: boolean = true;
   
   public toggleGridSnapping() {
       this.gridSnapping = !this.gridSnapping;
+  }
+
+  private onPointerMove(event: PointerEvent) {
+    if (this.state !== AppState.STABLE) {
+      this.highlightBox.visible = false;
+      this.previewVoxel.visible = false;
+      return;
+    }
+    
+    // Update color for preview
+    (this.previewVoxel.material as THREE.MeshBasicMaterial).color.setHex(this.currentColor);
+    
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    
+    const meshArray = Array.from(this.meshGroups.values());
+    const instIntersects = this.raycaster.intersectObjects(meshArray);
+
+    if (instIntersects.length > 0) {
+      const intersect = instIntersects[0];
+      const instanceId = intersect.instanceId;
+      if (instanceId === undefined) return;
+      
+      const mesh = intersect.object as THREE.InstancedMesh;
+      const matrix = new THREE.Matrix4();
+      mesh.getMatrixAt(instanceId, matrix);
+      const pos = new THREE.Vector3().setFromMatrixPosition(matrix);
+      
+      if (this.currentTool === BrushTool.ADD && intersect.face) {
+        const normal = intersect.face.normal.clone();
+        normal.transformDirection(mesh.matrixWorld);
+        const newPos = pos.clone().add(normal);
+        
+        if (!this.gridSnapping) {
+           newPos.copy(pos.clone().add(normal.multiplyScalar(0.5)));
+        }
+
+        this.highlightBox.visible = true;
+        this.highlightBox.position.copy(pos);
+        
+        this.previewVoxel.visible = true;
+        this.previewVoxel.position.copy(newPos);
+      } else if (this.currentTool === BrushTool.REMOVE || this.currentTool === BrushTool.PAINT || this.currentTool === BrushTool.SCULPT) {
+        this.highlightBox.visible = true;
+        this.highlightBox.position.copy(pos);
+        this.previewVoxel.visible = false;
+        
+        // Match Outline color to tool (Red for remove, Yellow for paint/sculpt)
+        (this.highlightBox.material as THREE.LineBasicMaterial).color.setHex(
+            this.currentTool === BrushTool.REMOVE ? 0xff0000 : 0xffff00
+        );
+      } else {
+        this.highlightBox.visible = false;
+        this.previewVoxel.visible = false;
+      }
+    } else {
+       this.highlightBox.visible = false;
+       
+       if (this.currentTool === BrushTool.ADD) {
+         const intersectsPlane = this.raycaster.intersectObject(this.scene.children.find(c => c.type === 'Mesh' && (c as THREE.Mesh).geometry.type === 'PlaneGeometry')!);
+         if (intersectsPlane.length > 0) {
+             const pt = intersectsPlane[0].point;
+             const x = this.gridSnapping ? Math.round(pt.x) : pt.x;
+             const z = this.gridSnapping ? Math.round(pt.z) : pt.z;
+             const y = this.gridSnapping ? Math.round(pt.y) + 0.5 : pt.y + 0.5;
+             this.previewVoxel.visible = true;
+             this.previewVoxel.position.set(x, y, z);
+         } else {
+             this.previewVoxel.visible = false;
+         }
+       } else {
+           this.previewVoxel.visible = false;
+       }
+    }
   }
   
   private onPointerDown(event: PointerEvent) {
@@ -178,13 +310,13 @@ export class VoxelEngine {
           // Remove voxel
           this.voxels.splice(voxelIndex, 1);
           this.createVoxels(this.getData()); // Recreate meshes
-          this.onInteraction();
+          this.onInteraction('Removed Voxel');
       } else if (this.currentTool === BrushTool.PAINT) {
           // Paint voxel
           this.voxels[voxelIndex].color = new THREE.Color(this.currentColor);
           this.voxels[voxelIndex].material = this.currentMaterial;
           this.createVoxels(this.getData());
-          this.onInteraction();
+          this.onInteraction('Painted Voxel');
       } else if (this.currentTool === BrushTool.ADD) {
           // Add voxel
           if (this.voxels.length >= this.MAX_VOXELS) return;
@@ -208,7 +340,7 @@ export class VoxelEngine {
               });
               
               this.createVoxels(this.getData());
-              this.onInteraction();
+              this.onInteraction('Added Voxel');
           }
       } else if (this.currentTool === BrushTool.SCULPT) {
           // Flatten / push inwards based on normal, pull if shift key
@@ -232,7 +364,7 @@ export class VoxelEngine {
             });
 
             this.createVoxels(this.getData());
-            this.onInteraction();
+            this.onInteraction('Sculpted Region');
           }
       }
     } else {
@@ -257,7 +389,7 @@ export class VoxelEngine {
                   rvx: 0, rvy: 0, rvz: 0
               });
               this.createVoxels(this.getData());
-              this.onInteraction();
+              this.onInteraction('Added Floor Voxel');
             }
         }
     }

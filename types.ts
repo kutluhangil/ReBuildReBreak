@@ -74,6 +74,7 @@ export interface SavedModel {
 
 export interface HistoryState {
   voxels: VoxelData[];
+  actionName?: string;
 }
 
 export interface SculptSettings {

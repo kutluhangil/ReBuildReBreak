@@ -310,24 +310,42 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             
             {/* Palette */}
             {currentTool !== BrushTool.REMOVE && (
-                <div className="bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl flex flex-col gap-2 border-2 border-slate-200 w-24 mt-2">
-                    <div className="grid grid-cols-2 gap-2 w-full">
+                <div className="bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl flex flex-col gap-2 border-2 border-slate-200 w-32 mt-2">
+                    <div className="grid grid-cols-4 gap-1.5 w-full">
                         {activePalette.colors.map(c => (
                             <button 
                                 key={c}
                                 onClick={() => onColorChange(c)}
-                                className={`w-full aspect-square rounded-full border-2 transition-transform ${currentColor.toLowerCase() === c.toLowerCase() ? 'border-sky-500 scale-110 shadow-md z-10' : 'border-slate-300 hover:scale-105'}`}
+                                title={c}
+                                className={`w-full aspect-square rounded-full border-2 transition-transform ${currentColor.toLowerCase() === c.toLowerCase() ? 'border-sky-500 scale-125 shadow-md z-10' : 'border-slate-300 hover:scale-110'}`}
                                 style={{ backgroundColor: c }}
                             />
                         ))}
                     </div>
-                    <div className="mt-2 h-px bg-slate-200 w-full" />
-                    <input 
-                        type="color" 
-                        value={currentColor} 
-                        onChange={(e) => onColorChange(e.target.value)}
-                        className="w-full h-8 rounded cursor-pointer mt-1"
-                    />
+                    <div className="mt-2 pt-2 border-t border-slate-200 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2 overflow-hidden bg-white border border-slate-200 rounded-lg pr-2">
+                           <input 
+                               type="color" 
+                               value={currentColor} 
+                               onChange={(e) => onColorChange(e.target.value)}
+                               title="Advanced Color Picker (Native RGB/HSL/Hex)"
+                               className="w-10 h-8 p-0 -ml-2 -my-2 border-0 cursor-pointer shrink-0 bg-transparent"
+                           />
+                           <span className="text-[10px] font-mono text-slate-500 select-all">{currentColor.toUpperCase()}</span>
+                        </div>
+                        <button
+                            onClick={() => {
+                                const upperColor = currentColor.toUpperCase();
+                                if (!activePalette.colors.includes(upperColor)) {
+                                    setPalettes(prev => prev.map(p => p.id === activePaletteId ? { ...p, colors: [...p.colors, upperColor] } : p))
+                                }
+                            }}
+                            title="Save current color to palette"
+                            className="w-full bg-slate-50 hover:bg-indigo-50 text-indigo-600 border border-indigo-100 hover:border-indigo-300 text-xs font-bold rounded py-1.5 transition-colors"
+                        >
+                            + Save Color
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -556,7 +574,7 @@ interface TactileButtonProps {
   disabled?: boolean;
   icon: React.ReactNode;
   label: string;
-  color: 'slate' | 'rose' | 'sky' | 'emerald' | 'amber' | 'indigo';
+  color: 'slate' | 'rose' | 'sky' | 'emerald' | 'amber' | 'indigo' | 'purple';
   compact?: boolean;
 }
 
@@ -568,12 +586,14 @@ const TactileButton: React.FC<TactileButtonProps> = ({ onClick, disabled, icon, 
     emerald: 'bg-emerald-500 text-white shadow-emerald-700 hover:bg-emerald-600',
     amber:   'bg-amber-400 text-amber-900 shadow-amber-600 hover:bg-amber-500',
     indigo:  'bg-indigo-500 text-white shadow-indigo-700 hover:bg-indigo-600',
+    purple:  'bg-purple-500 text-white shadow-purple-700 hover:bg-purple-600'
   };
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={label}
       className={`
         group relative flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all duration-100
         border-b-[4px] active:border-b-0 active:translate-y-[4px]
@@ -593,6 +613,7 @@ const BigActionButton: React.FC<{onClick: () => void, icon: React.ReactNode, lab
     return (
         <button 
             onClick={onClick}
+            title={label}
             className="group relative flex flex-col items-center justify-center w-32 h-32 rounded-3xl bg-rose-500 hover:bg-rose-600 text-white shadow-xl shadow-rose-900/30 border-b-[8px] border-rose-800 active:border-b-0 active:translate-y-[8px] transition-all duration-150"
         >
             <div className="mb-2">{icon}</div>

@@ -106,10 +106,15 @@ const App: React.FC = () => {
      localStorage.setItem('voxel_architect_rebuilds', JSON.stringify(customRebuilds));
   }, [customRebuilds]);
 
-  const pushToHistory = (data: VoxelData[]) => {
-      // Create new history state, discarding anything after current index if we undo'd
-      const newHistory = [...history.slice(0, historyIndex + 1), { voxels: [...data] }];
-      // Keep last 20 actions to prevent memory bloat
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+      setToastMessage(msg);
+      setTimeout(() => setToastMessage(null), 2000);
+  };
+
+  const pushToHistory = (data: VoxelData[], actionName?: string) => {
+      const newHistory = [...history.slice(0, historyIndex + 1), { voxels: [...data], actionName }];
       if (newHistory.length > 20) {
           newHistory.shift();
       }
@@ -118,13 +123,13 @@ const App: React.FC = () => {
   };
 
   const initHistory = (data: VoxelData[]) => {
-      setHistory([{voxels: [...data]}]);
+      setHistory([{voxels: [...data], actionName: 'Initial Load'}]);
       setHistoryIndex(0);
   }
 
-  const handleInteraction = () => {
+  const handleInteraction = (actionName?: string) => {
       if (engineRef.current) {
-          pushToHistory(engineRef.current.getData());
+          pushToHistory(engineRef.current.getData(), actionName);
       }
   };
 
@@ -207,6 +212,7 @@ const App: React.FC = () => {
           const newIndex = historyIndex - 1;
           setHistoryIndex(newIndex);
           engineRef.current.loadInitialModel(history[newIndex].voxels);
+          showToast(`Undo: ${history[historyIndex].actionName || 'Action reverted'}`);
       }
   }
 
@@ -215,6 +221,7 @@ const App: React.FC = () => {
           const newIndex = historyIndex + 1;
           setHistoryIndex(newIndex);
           engineRef.current.loadInitialModel(history[newIndex].voxels);
+          showToast(`Redo: ${history[newIndex].actionName || 'Action reapplied'}`);
       }
   }
 
@@ -510,6 +517,11 @@ const App: React.FC = () => {
         onClose={() => setIsPromptModalOpen(false)}
         onSubmit={handlePromptSubmit}
       />
+
+      {/* Undo/Redo Toast feedback */}
+      <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-800 text-white font-bold rounded-full shadow-2xl transition-all duration-300 pointer-events-none ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+        {toastMessage}
+      </div>
     </div>
   );
 };

@@ -1,20 +1,166 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+```
+██████╗ ███████╗██████╗ ██╗   ██╗██╗██╗     ██████╗ 
+██╔══██╗██╔════╝██╔══██╗██║   ██║██║██║     ██╔══██╗
+██████╔╝█████╗  ██████╔╝██║   ██║██║██║     ██║  ██║
+██╔══██╗██╔══╝  ██╔══██╗██║   ██║██║██║     ██║  ██║
+██║  ██║███████╗██████╔╝╚██████╔╝██║███████╗██████╔╝
+╚═╝  ╚═╝╚══════╝╚═════╝  ╚═════╝ ╚═╝╚══════╝╚═════╝ 
+```
+
+### The Ultimate 3D Voxel Toy Box
+
+*Tarayıcı tabanlı, fizik motorlu ve yapay zeka destekli 3D voksel inşa aracı.*
+
+---
+
+[![Version](https://img.shields.io/badge/version-1.0.0-C8FF00?style=flat-square&labelColor=0A0A0B)](https://github.com/kutluhangil)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white&labelColor=0A0A0B)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black&labelColor=0A0A0B)](https://react.dev/)
+[![Three.js](https://img.shields.io/badge/Three.js-WebGL-white?style=flat-square&logo=three.js&logoColor=black&labelColor=0A0A0B)](https://threejs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38BDF8?style=flat-square&logo=tailwindcss&logoColor=white&labelColor=0A0A0B)](https://tailwindcss.com/)
+[![Gemini AI](https://img.shields.io/badge/Google_Gemini-AI-4285F4?style=flat-square&logo=google&logoColor=white&labelColor=0A0A0B)](https://ai.google.dev/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-C8FF00?style=flat-square&labelColor=0A0A0B)](LICENSE)
+
+---
+
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## Proje Nedir?
 
-View your app in AI Studio: https://ai.studio/apps/91b27fb3-1454-4e03-99fc-43bdb9eceea4
+<details open>
+<summary><strong>Türkçe Açıklama</strong></summary>
+<br>
 
-## Run Locally
+ReBuild ReBreak, serbest çalışanlar, tasarımcılar ve yaratıcı beyinler için tasarlanmış kapsamlı bir 3D voksel oluşturma platformudur. Voksel yerleştirmekten fizik simulasyonuna, text-to-voxel AI üretiminden gelişmiş malzeme boyutlarına kadar aradığınız her şeyi modern, 3D bir deneyimde sunar.
 
-**Prerequisites:**  Node.js
+**Neden ReBuild ReBreak?**
+- Herhangi bir yazılım kurmadan doğrudan tarayıcı üzerinden voksel sanatı tasarlayın.
+- İnşa ettiğiniz modelleri gerçek zamanlı fizik motoru (yerçekimi & sürtünme) ile test edin ve parçalayın.
+- Gemini AI sayesinde "Bana bir uzay gemisi oluştur" yazarak saniyeler içinde üretim yapın.
+- Özel renk paletini kullanarak hassas HSL/RGB/HEX renklerini bloklarınıza uygulayın.
 
+</details>
+<br>
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+ReBuild ReBreak is an advanced **3D voxel sandbox** running entirely in the browser. It features a custom lightweight voxel engine built on Three.js, real-time physics parameters (gravity, friction), advanced brush tools, and seamless Generative AI capabilities via Google Gemini.
+
+---
+
+## Özellikler
+
+| # | Özellik | Açıklama |
+|---|---------|----------|
+| 🛠️ | **Hyper-Sculpting** | Ekleme, çıkarma, boyama ve akıllı şekillendirme (Sculpt) fırçaları |
+| 🤖 | **AI Generation** | Yazdığınız basit bir komut ile modeli sıfırdan yapay zeka aracılığıyla inşa etme |
+| 🌐 | **Live Physics** | Vokselleri serbest fizik ortamına bırakma, yerçekimi/sürtünme gibi değişkenleri doğrudan UI'dan yönetme |
+| 🎨 | **Gelişmiş Renkler** | Hex/RGB/HSL detayıyla renk seçici, UI üzerinde kendi paletini kaydetme |
+| 🔄 | **Akıllı Geçmiş** | Detaylı toast bildirimleri ve spesifik işlem isimleriyle geri/ileri alma (Undo/Redo) desteği |
+| ☁️ | **Dinamik Görüntü** | Göz yormayan dinamik Skybox background shader'ı ve odaklama yardımcısı Mesh Highlight outline efektleri |
+| 🗃️ | **JSON In/Out** | Modellerinizi bilgisayara JSON formatında kaydetme veya daha önce kaydettiğiniz tasarımları geri yükleme |
+| 📱 | **Responsive + UI** | Animasyonlu floating araç kutuları (UIOverlay), command palette tadında hissiyatlı butonlar |
+
+---
+
+## Teknoloji Yığını
+
+```
+Frontend & UI
+├── React 18 (Functional Components, Hooks)
+├── TypeScript (strict mode)
+├── Tailwind CSS 3.4 (Özelleştirilmiş animasyonlar ve utility'ler)
+├── Lucide React (Minimal icon seti)
+└── Vite (Hızlı build & HMR)
+
+3D Engine & Physics
+├── Three.js (Core 3D Rendering & Scene Graph)
+├── Custom WebGL Shaders (Skybox gradient, Highlight outlines)
+├── InstancedMesh Rendering (Performans için tek seferde binlerce küp yönetimi)
+└── Custom Physics Step (AABB bounds mapping, Velocity, Collision resolution)
+
+AI & Storage
+├── Google Generative AI (@google/genai, Text-to-Voxel Pipeline)
+└── Context & LocalStorage (Session Persistence & Custom Palettes)
+```
+
+---
+
+## Mimari
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      User Interface                     │
+│  (React Layer, WelcomeScreen, UIOverlay, Toast System)  │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│                  VoxelEngine (Three.js)                 │
+│                                                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐ │
+│  │ Mesh Arrays │  │ Raycaster   │  │ Camera & Lights │ │
+│  │ (Instanced) │  │ (Pointer)   │  │ (Ambient, Dir)  │ │
+│  └─────────────┘  └─────────────┘  └─────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────┐           │
+│  │     Custom Physics Loop (tick/animate)  │           │
+│  └─────────────────────────────────────────┘           │
+└─────────────────────────────────┬───────────────────────┘
+                                  │
+          ┌───────────────────────┼───────────────────┐
+          │                                           │
+┌─────────▼────────┐                         ┌────────▼──────┐
+│  State Manager   │                         │  Gemini API   │
+│ (Undo/Redo/Save) │                         │ (Text-to-JSON)│
+└──────────────────┘                         └───────────────┘
+```
+
+---
+
+## Başlarken
+
+### Gereksinimler
+
+- **Node.js** ≥ 18
+- **npm** ≥ 9
+- **Google Gemini API Anahtarı** (Yapay zeka üretim özelliği için)
+
+### Yerel Geliştirme
+
+```bash
+# Repoyu klonlama
+git clone https://github.com/kutluhangil/rebuild-rebreak.git
+cd rebuild-rebreak
+
+# Bağımlılıkları yükleme
+npm install
+
+# Environment dosyasını oluştur (VITE_ prefix ile)
+cp .env.example .env.local
+# .env.local dosyasını düzenleyip Gemini Key'i girin
+
+# Geliştirme sunucusunu başlat
+npm run dev
+```
+
+Uygulama `http://localhost:3000` adresinde çalışır.
+
+---
+
+## Lisans
+
+Bu proje [MIT Lisansı](LICENSE) altında dağıtılmaktadır.
+
+---
+
+<div align="center">
+
+**Built with precision by [kutluhangil](https://github.com/kutluhangil/)**
+
+*Sanat ile kodun 3D buluşması.*
+
+[![GitHub](https://img.shields.io/badge/GitHub-kutluhangil-C8FF00?style=flat-square&logo=github&logoColor=white&labelColor=0A0A0B)](https://github.com/kutluhangil)
+
+</div>

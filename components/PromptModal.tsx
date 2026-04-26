@@ -11,17 +11,19 @@ interface PromptModalProps {
   isOpen: boolean;
   mode: 'create' | 'morph';
   onClose: () => void;
-  onSubmit: (prompt: string) => Promise<void>;
+  onSubmit: (prompt: string, folder?: string) => Promise<void>;
 }
 
 export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, mode, onClose, onSubmit }) => {
   const [prompt, setPrompt] = useState('');
+  const [folder, setFolder] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setPrompt('');
+      setFolder('');
       setError('');
       setIsLoading(false);
     }
@@ -37,8 +39,9 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, mode, onClose,
     setError('');
     
     try {
-      await onSubmit(prompt);
+      await onSubmit(prompt, folder.trim() || undefined);
       setPrompt('');
+      setFolder('');
       onClose();
     } catch (err) {
       console.error(err);
@@ -102,6 +105,15 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, mode, onClose,
               disabled={isLoading}
               className={`w-full h-32 resize-none bg-slate-50 border-2 border-slate-200 rounded-xl p-4 font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all placeholder:text-slate-400 mb-4 ${isCreate ? 'focus:border-sky-400 focus:ring-sky-100' : 'focus:border-amber-400 focus:ring-amber-100'}`}
               autoFocus
+            />
+            
+            <input
+                type="text"
+                value={folder}
+                onChange={(e) => setFolder(e.target.value)}
+                placeholder="Folder (Optional)"
+                disabled={isLoading}
+                className={`w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all placeholder:text-slate-400 mb-4 ${isCreate ? 'focus:border-sky-400 focus:ring-sky-100' : 'focus:border-amber-400 focus:ring-amber-100'}`}
             />
 
             {error && (

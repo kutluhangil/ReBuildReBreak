@@ -12,11 +12,29 @@ export enum AppState {
   REBUILDING = 'REBUILDING'
 }
 
+export enum MaterialType {
+  SOLID = 'SOLID',
+  WOOD = 'WOOD',
+  METAL = 'METAL',
+  GLASS = 'GLASS',
+  STONE = 'STONE',
+  PLASTIC = 'PLASTIC',
+  FABRIC = 'FABRIC'
+}
+
+export enum BrushTool {
+  ADD = 'ADD',
+  REMOVE = 'REMOVE',
+  PAINT = 'PAINT',
+  SCULPT = 'SCULPT'
+}
+
 export interface VoxelData {
   x: number;
   y: number;
   z: number;
   color: number;
+  material?: MaterialType;
 }
 
 export interface SimulationVoxel {
@@ -25,6 +43,7 @@ export interface SimulationVoxel {
   y: number;
   z: number;
   color: THREE.Color;
+  material: MaterialType;
   // Physics state
   vx: number;
   vy: number;
@@ -46,7 +65,33 @@ export interface RebuildTarget {
 }
 
 export interface SavedModel {
+  id: string;
   name: string;
   data: VoxelData[];
   baseModel?: string;
+  folder?: string;
+}
+
+export interface HistoryState {
+  voxels: VoxelData[];
+}
+
+export interface SculptSettings {
+  size: number;
+  strength: number;
+}
+
+export type MaterialConfigMap = Record<MaterialType, any>;
+
+export interface PhysicsConfig {
+  gravity: number;
+  bounce: number;
+  friction: number;
+  explosionForce: number;
+}
+
+export interface ColorPalette {
+  id: string;
+  name: string;
+  colors: string[];
 }

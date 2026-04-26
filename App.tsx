@@ -155,11 +155,8 @@ const App: React.FC = () => {
     const handleResize = () => engine.handleResize();
     window.addEventListener('resize', handleResize);
 
-    const timer = setTimeout(() => setShowWelcome(false), 5000);
-
     return () => {
       window.removeEventListener('resize', handleResize);
-      clearTimeout(timer);
       engine.cleanup();
     };
   }, []);
@@ -497,7 +494,7 @@ const App: React.FC = () => {
         onDelete={handleDeleteBuild}
       />
 
-      <WelcomeScreen visible={showWelcome} />
+      <WelcomeScreen visible={showWelcome} onDismiss={() => setShowWelcome(false)} />
 
       <JsonModal 
         isOpen={isJsonModalOpen}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, SavedModel, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap } from '../types';
-import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2 } from 'lucide-react';
+import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2, Trash2 } from 'lucide-react';
 import { MaterialPreview } from './MaterialPreview';
 
 interface UIOverlayProps {
@@ -41,6 +41,8 @@ interface UIOverlayProps {
   onMaterialChange: (material: MaterialType) => void;
   onGridSnapToggle: () => void;
   onPhysicsConfigChange: (config: PhysicsConfig) => void;
+  onPhysicsPanelToggle?: (isOpen: boolean) => void;
+  onClear: () => void;
   onSculptSettingsChange: (settings: SculptSettings) => void;
   onMaterialConfigChange: (config: MaterialConfigMap) => void;
   onUndo: () => void;
@@ -96,6 +98,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onRedo,
   onGridSnapToggle,
   onPhysicsConfigChange,
+  onPhysicsPanelToggle,
+  onClear,
   onSculptSettingsChange,
   onMaterialConfigChange
 }) => {
@@ -107,6 +111,12 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   const [showPhysicsPanel, setShowPhysicsPanel] = useState(false);
   const [showPalettePanel, setShowPalettePanel] = useState(false);
   const [showMaterialPanel, setShowMaterialPanel] = useState(false);
+
+  useEffect(() => {
+    if (onPhysicsPanelToggle) {
+        onPhysicsPanelToggle(showPhysicsPanel);
+    }
+  }, [showPhysicsPanel, onPhysicsPanelToggle]);
 
   // Advanced Palette State
   const [palettes, setPalettes] = useState<ColorPalette[]>([
@@ -483,12 +493,18 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
         <div className="pointer-events-auto transition-all duration-500 ease-in-out transform">
             {/* STATE 1: STABLE -> DISMANTLE */}
             {isStable && (
-                 <div className="animate-in slide-in-from-bottom-10 fade-in duration-300">
+                 <div className="flex gap-4 animate-in slide-in-from-bottom-10 fade-in duration-300">
                      <BigActionButton 
                         onClick={onDismantle} 
                         icon={<Hammer size={32} strokeWidth={2.5} />} 
                         label="BREAK" 
                         color="rose" 
+                     />
+                     <TactileButton
+                        onClick={onClear}
+                        color="slate"
+                        icon={<Trash2 size={24} strokeWidth={2.5} />}
+                        label="CLEAR"
                      />
                  </div>
             )}

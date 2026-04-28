@@ -55,6 +55,7 @@ export class VoxelEngine {
   private gravityGizmo: THREE.ArrowHelper;
   private bounceGizmo: THREE.ArrowHelper;
   private frictionGizmo: THREE.ArrowHelper;
+  public physicsGizmosVisible: boolean = false;
   
   private highlightBox: THREE.Mesh;
   private previewVoxel: THREE.Mesh;
@@ -586,12 +587,13 @@ export class VoxelEngine {
 
   private updatePhysics() {
     // Gizmos Logic
-    this.gravityGizmo.visible = this.state === AppState.DISMANTLING;
-    this.bounceGizmo.visible = this.state === AppState.DISMANTLING;
-    this.frictionGizmo.visible = this.state === AppState.DISMANTLING;
+    const showGizmos = this.state === AppState.DISMANTLING || this.physicsGizmosVisible;
+    this.gravityGizmo.visible = showGizmos;
+    this.bounceGizmo.visible = showGizmos;
+    this.frictionGizmo.visible = showGizmos;
     
-    if (this.state === AppState.DISMANTLING) {
-        this.gravityGizmo.setLength(Math.abs(this.physicsConfig.gravity) * 0.4);
+    if (showGizmos) {
+        this.gravityGizmo.setLength(Math.abs(this.physicsConfig.gravity) * 0.4 || 0.1);
         this.bounceGizmo.setLength(Math.max(0.1, this.physicsConfig.bounce * 6));
         this.frictionGizmo.setLength(Math.max(0.1, this.physicsConfig.friction * 6));
     }

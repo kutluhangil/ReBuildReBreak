@@ -141,7 +141,7 @@ const App: React.FC = () => {
       containerRef.current,
       (newState) => setAppState(newState),
       (count) => setVoxelCount(count),
-      () => handleInteraction()
+      (actionName) => handleInteraction(actionName)
     );
 
     engineRef.current = engine;
@@ -224,6 +224,16 @@ const App: React.FC = () => {
           showToast(`Redo: ${history[newIndex].actionName || 'Action reapplied'}`);
       }
   }
+
+  const handleClear = () => {
+     if (window.confirm('Are you sure you want to delete all voxels from the scene? This cannot be undone.')) {
+         if (engineRef.current) {
+             engineRef.current.loadInitialModel([]);
+             initHistory([]);
+             showToast('Scene cleared');
+         }
+     }
+  };
 
   const handleDismantle = () => {
     engineRef.current?.dismantle();
@@ -476,6 +486,12 @@ const App: React.FC = () => {
         onMaterialConfigChange={setMaterialConfig}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onClear={handleClear}
+        onPhysicsPanelToggle={(isOpen) => {
+            if (engineRef.current) {
+                engineRef.current.physicsGizmosVisible = isOpen;
+            }
+        }}
         
         onDismantle={handleDismantle}
         onRebuild={handleRebuild}

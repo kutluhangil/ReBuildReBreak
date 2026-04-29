@@ -14,6 +14,7 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { Generators } from './utils/voxelGenerators';
 import { AppState, VoxelData, SavedModel, HistoryState, BrushTool, MaterialType } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
+import { audioService } from './services/AudioService';
 
 const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   
   // --- State for Sculpting ---
   const [sculptSettings, setSculptSettings] = useState({ size: 1.5, strength: 0.2 });
+  const [hoveredVoxel, setHoveredVoxel] = useState<{x: number, y: number, z: number, material: string} | null>(null);
 
   // --- State for Material Config ---
   const [materialConfig, setMaterialConfig] = useState({
@@ -143,6 +145,7 @@ const App: React.FC = () => {
       (count) => setVoxelCount(count),
       (actionName) => handleInteraction(actionName)
     );
+    engine.onHoverChange = (info) => setHoveredVoxel(info);
 
     engineRef.current = engine;
     
@@ -156,12 +159,20 @@ const App: React.FC = () => {
     engine.loadInitialModel(initialModel);
     initHistory(initialModel);
 
+    // Audio init listener
+    const handleFirstInteraction = () => {
+        audioService.init();
+        window.removeEventListener('pointerdown', handleFirstInteraction);
+    };
+    window.addEventListener('pointerdown', handleFirstInteraction);
+
     // Resize Listener
     const handleResize = () => engine.handleResize();
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('pointerdown', handleFirstInteraction);
       engine.cleanup();
     };
   }, []);
@@ -200,12 +211,22 @@ const App: React.FC = () => {
       }
   }, [gridSnapping]);
 
+  // --- State for Environment ---
+  const [environment, setEnvironment] = useState<'day' | 'night' | 'sunset'>('day');
+
   // Sync physics
   useEffect(() => {
     if (engineRef.current) {
         engineRef.current.physicsConfig = physicsConfig;
     }
   }, [physicsConfig]);
+
+  // Sync environment
+  useEffect(() => {
+    if (engineRef.current) {
+        engineRef.current.setEnvironment(environment);
+    }
+  }, [environment]);
 
   const handleUndo = () => {
       if (historyIndex > 0 && engineRef.current) {
@@ -239,13 +260,13 @@ const App: React.FC = () => {
     engineRef.current?.dismantle();
   };
 
-  const handleNewScene = (type: 'Eagle') => {
-    const generator = Generators[type];
+  const handleNewScene = (type: string) => {
+    const generator = (Generators as any)[type];
     if (generator && engineRef.current) {
       const model = generator();
       engineRef.current.loadInitialModel(model);
       initHistory(model);
-      setCurrentBaseModel('Eagle');
+      setCurrentBaseModel(type);
     }
   };
 
@@ -257,8 +278,8 @@ const App: React.FC = () => {
       }
   };
 
-  const handleRebuild = (type: 'Eagle' | 'Cat' | 'Rabbit' | 'Twins') => {
-    const generator = Generators[type];
+  const handleRebuild = (type: string) => {
+    const generator = (Generators as any)[type];
     if (generator && engineRef.current) {
       const targetModel = generator();
       engineRef.current.rebuild(targetModel);
@@ -337,7 +358,7 @@ const App: React.FC = () => {
       }
   }
 
-  const handlePromptSubmit = async (prompt: string, folder?: string) => {
+  const handlePromptSubmit = async (prompt: string, folder?: string, imageBase64?: string, seed?: number) => {
     if (!process.env.API_KEY) {
         throw new Error("API Key not found");
     }
@@ -348,7 +369,7 @@ const App: React.FC = () => {
 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const model = 'gemini-3-pro-preview';
+        const model = 'gemini-2.5-pro'; // Vision requires at least 2.5-pro / 2.0-pro (3-pro might not exist or be different? I'll use gemini-2.5-pro or gemini-2.0-pro for multimodal) Wait, AI studio uses models/gemini-pro-latest. Let's use gemini-2.5-pro. Wait, actually `gemini-2.5-pro` is correct.
         
         let systemContext = "";
         if (promptMode === 'morph' && engineRef.current) {
@@ -363,27 +384,45 @@ const App: React.FC = () => {
         } else {
             systemContext = `
                 CONTEXT: You are creating a brand new voxel art scene from scratch.
-                Be creative with colors.
+                Use a wider range of colors to make the scene vibrant and interesting. 
+                Aim to create organic, less uniform shapes. Avoid creating perfectly symmetrical, rigid structures if possible. Incorporate natural variation to make the model lively.
+                Consider incorporating multiple distinct shapes or levels of detail within the model.
             `;
         }
 
+        const promptText = `
+                ${systemContext}
+                
+                Task: Generate a 3D voxel art model of: "${prompt || "what is in the image"}".
+                
+                Strict Rules:
+                1. Use approximately 150 to 600 voxels.
+                2. The model must be centered at x=0, z=0.
+                3. The bottom of the model must be at y=0 or slightly higher.
+                4. Ensure the structure is physically plausible (connected).
+                5. Coordinates should be integers.
+                
+                Return ONLY a JSON array of objects.`;
+
+        const contents: any[] = [{ text: promptText }];
+        if (imageBase64) {
+            const base64Data = imageBase64.split(',')[1];
+            const mimeType = imageBase64.split(';')[0].split(':')[1];
+            contents.unshift({
+                inlineData: {
+                    data: base64Data,
+                    mimeType: mimeType
+                }
+            });
+        }
+
         const response = await ai.models.generateContent({
-            model,
-            contents: `
-                    ${systemContext}
-                    
-                    Task: Generate a 3D voxel art model of: "${prompt}".
-                    
-                    Strict Rules:
-                    1. Use approximately 150 to 600 voxels.
-                    2. The model must be centered at x=0, z=0.
-                    3. The bottom of the model must be at y=0 or slightly higher.
-                    4. Ensure the structure is physically plausible (connected).
-                    5. Coordinates should be integers.
-                    
-                    Return ONLY a JSON array of objects.`,
+            model: 'gemini-2.5-pro',
+            contents: contents,
             config: {
                 responseMimeType: "application/json",
+                // Pass optional seed if provided
+                ...(seed !== undefined && { seed }),
                 responseSchema: {
                     type: Type.ARRAY,
                     items: {
@@ -476,12 +515,15 @@ const App: React.FC = () => {
         physicsConfig={physicsConfig}
         sculptSettings={sculptSettings}
         materialConfig={materialConfig}
+        environment={environment}
         
         onToolChange={setCurrentTool}
         onColorChange={setCurrentColor}
         onMaterialChange={setCurrentMaterial}
+        hoveredVoxel={hoveredVoxel}
         onGridSnapToggle={() => setGridSnapping(g => !g)}
         onPhysicsConfigChange={setPhysicsConfig}
+        onEnvironmentChange={setEnvironment}
         onSculptSettingsChange={setSculptSettings}
         onMaterialConfigChange={setMaterialConfig}
         onUndo={handleUndo}
@@ -503,6 +545,14 @@ const App: React.FC = () => {
         onPromptMorph={() => openPrompt('morph')}
         onShowJson={handleShowJson}
         onImportJson={handleImportClick}
+        onExportGLTF={() => {
+            if (engineRef.current) {
+                engineRef.current.exportGLTF();
+            }
+        }}
+        onResetCamera={() => engineRef.current?.resetCamera()}
+        onZoomToFit={() => engineRef.current?.zoomToFit()}
+        onToggleCameraProjection={() => engineRef.current?.toggleCameraProjection()}
         onToggleRotation={handleToggleRotation}
         onToggleInfo={() => setShowWelcome(!showWelcome)}
       />

@@ -4,26 +4,31 @@
 */
 
 
-import React, { useState, useEffect } from 'react';
-import { Sparkles, X, Loader2, Wand2, Hammer } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, X, Loader2, Wand2, Hammer, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 interface PromptModalProps {
   isOpen: boolean;
   mode: 'create' | 'morph';
   onClose: () => void;
-  onSubmit: (prompt: string, folder?: string) => Promise<void>;
+  onSubmit: (prompt: string, folder?: string, imageBase64?: string, seed?: number) => Promise<void>;
 }
 
 export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, mode, onClose, onSubmit }) => {
   const [prompt, setPrompt] = useState('');
   const [folder, setFolder] = useState('');
+  const [seed, setSeed] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setPrompt('');
       setFolder('');
+      setSeed('');
+      setImagePreview(null);
       setError('');
       setIsLoading(false);
     }
@@ -31,17 +36,29 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, mode, onClose,
 
   if (!isOpen) return null;
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!prompt.trim() || isLoading) return;
+    if ((!prompt.trim() && !imagePreview) || isLoading) return;
     
     setIsLoading(true);
     setError('');
     
     try {
-      await onSubmit(prompt, folder.trim() || undefined);
+      await onSubmit(prompt, folder.trim() || undefined, imagePreview || undefined, seed ? parseInt(seed) : undefined);
       setPrompt('');
       setFolder('');
+      setSeed('');
+      setImagePreview(null);
       onClose();
     } catch (err) {
       console.error(err);
@@ -106,15 +123,41 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, mode, onClose,
               className={`w-full h-32 resize-none bg-slate-50 border-2 border-slate-200 rounded-xl p-4 font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all placeholder:text-slate-400 mb-4 ${isCreate ? 'focus:border-sky-400 focus:ring-sky-100' : 'focus:border-amber-400 focus:ring-amber-100'}`}
               autoFocus
             />
+
+            <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
             
-            <input
-                type="text"
-                value={folder}
-                onChange={(e) => setFolder(e.target.value)}
-                placeholder="Folder (Optional)"
-                disabled={isLoading}
-                className={`w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all placeholder:text-slate-400 mb-4 ${isCreate ? 'focus:border-sky-400 focus:ring-sky-100' : 'focus:border-amber-400 focus:ring-amber-100'}`}
-            />
+            {!imagePreview ? (
+                <button type="button" onClick={() => fileInputRef.current?.click()} className={`w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-xl py-3 mb-4 text-slate-500 font-bold hover:bg-slate-50 transition-colors ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <ImageIcon size={20} /> Attach Image (Optional)
+                </button>
+            ) : (
+                <div className="relative w-full h-32 mb-4 rounded-xl border-2 border-slate-200 overflow-hidden group">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setImagePreview(null)} className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-500 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            )}
+            
+            <div className="flex gap-4 mb-4">
+                <input
+                    type="text"
+                    value={folder}
+                    onChange={(e) => setFolder(e.target.value)}
+                    placeholder="Folder (Optional)"
+                    disabled={isLoading}
+                    className={`flex-1 bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all placeholder:text-slate-400 ${isCreate ? 'focus:border-sky-400 focus:ring-sky-100' : 'focus:border-amber-400 focus:ring-amber-100'}`}
+                />
+                
+                <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(e.target.value)}
+                    placeholder="Seed (Optional)"
+                    disabled={isLoading}
+                    className={`w-32 bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-2 font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all placeholder:text-slate-400 ${isCreate ? 'focus:border-sky-400 focus:ring-sky-100' : 'focus:border-amber-400 focus:ring-amber-100'}`}
+                />
+            </div>
 
             {error && (
               <div className="mb-4 p-3 rounded-xl bg-rose-50 text-rose-600 text-sm font-bold flex items-center gap-2">

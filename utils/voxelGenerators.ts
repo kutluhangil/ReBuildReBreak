@@ -171,5 +171,166 @@ export const Generators = {
         buildMiniEagle(-10, 2, false);
         buildMiniEagle(10, -2, true);
         return Array.from(map.values());
+    },
+
+    Tree: (): VoxelData[] => {
+        const map = new Map<string, VoxelData>();
+        const TY = CONFIG.FLOOR_Y;
+        const TX = 0, TZ = 0;
+        // Trunk
+        for (let y = 0; y < 14; y++) {
+            const rad = Math.max(1, 4 - (y * 0.25));
+            generateSphere(map, TX, TY + y, TZ, rad, COLORS.WOOD, 1);
+        }
+        // Roots
+        for(let a=0; a<Math.PI*2; a+=Math.PI/2) {
+            for(let r=3; r<7; r++) {
+                const h = Math.max(0, 3 - (r-3)*0.8);
+                if (h > 0.5) generateSphere(map, Math.cos(a)*r, TY + h/2, Math.sin(a)*r, h, COLORS.WOOD);
+            }
+        }
+        // Canopy Layers
+        generateSphere(map, TX, TY + 14, TZ, 7, COLORS.GREEN, 0.7);
+        generateSphere(map, TX + 2, TY + 17, TZ + 2, 6, COLORS.GREEN, 0.8);
+        generateSphere(map, TX - 3, TY + 16, TZ - 2, 5.5, COLORS.GREEN, 0.8);
+        generateSphere(map, TX, TY + 21, TZ, 4.5, COLORS.GREEN, 0.9);
+        // Apples
+        for(let i=0; i<15; i++) {
+            const ax = (Math.random()-0.5)*12;
+            const ay = TY + 14 + Math.random()*7;
+            const az = (Math.random()-0.5)*12;
+            if (ax*ax + az*az < 36) {
+                setBlock(map, TX+ax, ay, TZ+az, 0xFF3333); // Red apple
+            }
+        }
+        return Array.from(map.values());
+    },
+
+    House: (): VoxelData[] => {
+        const map = new Map<string, VoxelData>();
+        const HY = CONFIG.FLOOR_Y + 1;
+        const W = 7, D = 5, H = 6;
+        const WALL_C = COLORS.LIGHT;
+        const ROOF_C = COLORS.DARK;
+        
+        // Base and Walls
+        for(let x=-W; x<=W; x++) {
+            for(let z=-D; z<=D; z++) {
+                for(let y=0; y<=H; y++) {
+                    if (x===-W || x===W || z===-D || z===D || y===0) {
+                        setBlock(map, x, HY+y, z, WALL_C);
+                    }
+                }
+            }
+        }
+        // Roof
+        for(let y=0; y<=6; y++) {
+            const shrink = y;
+            for(let x=-(W+1)+shrink; x<=(W+1)-shrink; x++) {
+                for(let z=-(D+1); z<=(D+1); z++) {
+                    if (x >= -W && x <= W && z >= -D && z <= D && y < 5) continue; // Hollow roof
+                    setBlock(map, x, HY+H+y, z, ROOF_C);
+                }
+            }
+        }
+        // Door
+        for(let x=-1; x<=1; x++) for(let y=1; y<=4; y++) {
+            setBlock(map, x, HY+y, D, COLORS.WOOD);
+        }
+        setBlock(map, 1, HY+2, D+1, COLORS.GOLD); // knob
+        // Windows
+        for(let x of [-4, 4]) {
+            for(let dx=-1; dx<=1; dx++) for(let dy=2; dy<=4; dy++) {
+                setBlock(map, x+dx, HY+dy, D, 0x88CCFF);
+            }
+        }
+        // Chimney
+        for(let y=0; y<6; y++) {
+            for(let cx=-4; cx<=-2; cx++) for(let cz=-2; cz<=0; cz++) {
+                setBlock(map, cx, HY+H+y, cz, 0x995544);
+            }
+        }
+        return Array.from(map.values());
+    },
+
+    Robot: (): VoxelData[] => {
+        const map = new Map<string, VoxelData>();
+        const RY = CONFIG.FLOOR_Y + 1;
+        const BODY_C = 0xAAABB8;
+        const JOINT_C = 0x555555;
+        const EYE_C = 0x33FFCC;
+        const ACCENT_C = 0xFF5555;
+
+        // Legs (Wheels/Treads)
+        generateSphere(map, -3, RY+2, 0, 3, JOINT_C, 0.5);
+        generateSphere(map, 3, RY+2, 0, 3, JOINT_C, 0.5);
+        for(let x=-4; x<=4; x++) for(let z=-2; z<=2; z++) setBlock(map, x, RY+2, z, JOINT_C);
+
+        // Body Torso
+        for(let x=-5; x<=5; x++) for(let y=4; y<=12; y++) for(let z=-4; z<=4; z++) {
+            setBlock(map, x, RY+y, z, BODY_C);
+        }
+        // Chest Screen
+        for(let x=-3; x<=3; x++) for(let y=6; y<=10; y++) setBlock(map, x, RY+y, 5, 0x222222);
+        // Arms
+        generateSphere(map, -7, RY+10, 0, 2.5, JOINT_C);
+        generateSphere(map, 7, RY+10, 0, 2.5, JOINT_C);
+        for(let y=5; y<=9; y++) {
+            setBlock(map, -8, RY+y, 0, BODY_C); setBlock(map, -7, RY+y, 0, BODY_C);
+            setBlock(map, 8, RY+y, 0, BODY_C); setBlock(map, 7, RY+y, 0, BODY_C);
+        }
+        // Claws
+        setBlock(map, -8, RY+4, 1, ACCENT_C); setBlock(map, -8, RY+4, -1, ACCENT_C);
+        setBlock(map, 8, RY+4, 1, ACCENT_C); setBlock(map, 8, RY+4, -1, ACCENT_C);
+
+        // Neck
+        generateSphere(map, 0, RY+13, 0, 1.5, JOINT_C);
+
+        // Head
+        for(let x=-3; x<=3; x++) for(let y=14; y<=18; y++) for(let z=-3; z<=3; z++) {
+            setBlock(map, x, RY+y, z, BODY_C);
+        }
+        // Eyes
+        setBlock(map, -1.5, RY+16, 4, EYE_C); setBlock(map, -1.5, RY+16.5, 4, EYE_C);
+        setBlock(map, 1.5, RY+16, 4, EYE_C); setBlock(map, 1.5, RY+16.5, 4, EYE_C);
+
+        // Antenna
+        for(let y=19; y<=21; y++) setBlock(map, 0, RY+y, 0, JOINT_C);
+        setBlock(map, 0, RY+22, 0, ACCENT_C);
+
+        return Array.from(map.values());
+    },
+
+    Terrain: (): VoxelData[] => {
+        const map = new Map<string, VoxelData>();
+        const size = 15;
+        for (let x = -size; x <= size; x++) {
+            for (let z = -size; z <= size; z++) {
+                // simple pseudo-random "noise" based on sine waves
+                const h = Math.floor(Math.sin(x * 0.2) * Math.cos(z * 0.2) * 5 + Math.sin(x * 0.5) * 2);
+                for (let y = -2; y <= h; y++) {
+                    let color = COLORS.DIRT;
+                    if (y === h) {
+                        color = COLORS.GREEN;
+                        if (h > 4) color = 0xEEEEEE; // Snow peak
+                        if (h < -1) color = COLORS.SAND; // Sand/beach
+                    }
+                    setBlock(map, x, CONFIG.FLOOR_Y + 1 + y, z, color);
+                }
+                // Trees
+                if (h >= 0 && h < 4 && Math.random() < 0.05) {
+                    for (let ty = 1; ty <= 4; ty++) setBlock(map, x, CONFIG.FLOOR_Y + 1 + h + ty, z, COLORS.WOOD);
+                    for (let tx = -1; tx <= 1; tx++) {
+                        for (let tz = -1; tz <= 1; tz++) {
+                            for (let ty = 3; ty <= 5; ty++) {
+                                if (Math.abs(tx) === 1 && Math.abs(tz) === 1 && ty === 5) continue;
+                                setBlock(map, x + tx, CONFIG.FLOOR_Y + 1 + h + ty, z + tz, COLORS.GREEN);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return Array.from(map.values());
     }
 };

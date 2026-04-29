@@ -6,8 +6,10 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 import { AppState, SimulationVoxel, RebuildTarget, VoxelData, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap } from '../types';
 import { CONFIG, COLORS } from '../utils/voxelConstants';
+import { audioService } from './AudioService';
 
 interface MeshGroup {
   materialType: MaterialType;
@@ -17,14 +19,20 @@ interface MeshGroup {
 export class VoxelEngine {
   private container: HTMLElement;
   public scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  private isOrthographic: boolean = false;
   private renderer: THREE.WebGLRenderer;
   public controls: OrbitControls;
   private meshGroups: Map<MaterialType, THREE.InstancedMesh> = new Map();
   private dummy = new THREE.Object3D();
   
+  private ambientLight!: THREE.AmbientLight;
+  private dirLight!: THREE.DirectionalLight;
+  private floorMesh!: THREE.Mesh;
+  
   private voxels: SimulationVoxel[] = [];
   private rebuildTargets: RebuildTarget[] = [];
+  private projectiles: { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number }[] = [];
   private rebuildStartTime: number = 0;
   
   private state: AppState = AppState.STABLE;
@@ -62,6 +70,8 @@ export class VoxelEngine {
   
   private onInteraction: (action?: string) => void;
 
+  public onHoverChange?: (info: {x: number, y: number, z: number, material: string} | null) => void;
+
   public physicsConfig: PhysicsConfig = {
       gravity: -14.0,
       bounce: 0.6,
@@ -83,38 +93,9 @@ export class VoxelEngine {
     // Init Three.js
     this.scene = new THREE.Scene();
     
-    // Skybox
-    const vertexShader = `
-      varying vec3 vWorldPosition;
-      void main() {
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `;
-    const fragmentShader = `
-      uniform vec3 topColor;
-      uniform vec3 bottomColor;
-      varying vec3 vWorldPosition;
-      void main() {
-        float h = normalize(vWorldPosition).y;
-        gl_FragColor = vec4(mix(bottomColor, topColor, max(h, 0.0)), 1.0);
-      }
-    `;
-    const uniforms = {
-      topColor: { value: new THREE.Color(0x87CEEB) }, // Sky blue
-      bottomColor: { value: new THREE.Color(0xE0F7FA) } // Light cyan/white
-    };
-    const skyGeo = new THREE.SphereGeometry(500, 32, 15);
-    const skyMat = new THREE.ShaderMaterial({
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-      uniforms: uniforms,
-      side: THREE.BackSide
-    });
-    const sky = new THREE.Mesh(skyGeo, skyMat);
-    this.scene.add(sky);
-    this.scene.fog = new THREE.Fog(0xE0F7FA, 60, 140); // Match bottom color
+    // Basic Background
+    this.scene.background = new THREE.Color(0xf1f5f9);
+    this.scene.fog = new THREE.Fog(0xf1f5f9, 50, 150);
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     // Slightly zoomed out start position
@@ -122,8 +103,7 @@ export class VoxelEngine {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = false;
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -161,27 +141,19 @@ export class VoxelEngine {
     this.scene.add(this.previewVoxel);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    this.scene.add(this.ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    dirLight.position.set(50, 80, 30);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.left = -40;
-    dirLight.shadow.camera.right = 40;
-    dirLight.shadow.camera.top = 40;
-    dirLight.shadow.camera.bottom = -40;
-    this.scene.add(dirLight);
+    this.dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    this.dirLight.position.set(50, 80, 30);
+    this.scene.add(this.dirLight);
 
     // Floor
     const planeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), planeMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = CONFIG.FLOOR_Y;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+    this.floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), planeMat);
+    this.floorMesh.rotation.x = -Math.PI / 2;
+    this.floorMesh.position.y = CONFIG.FLOOR_Y;
+    this.scene.add(this.floorMesh);
 
     this.animate = this.animate.bind(this);
     this.animate();
@@ -195,6 +167,77 @@ export class VoxelEngine {
   
   public toggleGridSnapping() {
       this.gridSnapping = !this.gridSnapping;
+  }
+
+  public resetCamera() {
+      this.camera.position.set(30, 30, 60);
+      this.controls.target.set(0, 0, 0);
+      this.controls.update();
+  }
+
+  public zoomToFit() {
+      if (this.voxels.length === 0) return;
+      const box = new THREE.Box3();
+      this.voxels.forEach(v => {
+          box.expandByPoint(new THREE.Vector3(v.x, v.y, v.z));
+      });
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = this.camera.fov * (Math.PI / 180);
+      const dist = Math.abs(maxDim / Math.sin(fov / 2));
+      
+      this.controls.target.copy(center);
+      this.camera.position.copy(center).add(new THREE.Vector3(1, 1, 1).normalize().multiplyScalar(dist));
+      this.controls.update();
+  }
+
+  public toggleCameraProjection() {
+      const position = this.camera.position.clone();
+      const target = this.controls.target.clone();
+      
+      if (!this.isOrthographic) {
+          const aspect = window.innerWidth / window.innerHeight;
+          const dist = position.distanceTo(target);
+          const frustumSize = dist * Math.tan(((this.camera as THREE.PerspectiveCamera).fov / 2) * Math.PI / 180) * 2;
+          
+          this.camera = new THREE.OrthographicCamera(
+              frustumSize * aspect / -2,
+              frustumSize * aspect / 2,
+              frustumSize / 2,
+              frustumSize / -2,
+              0.1,
+              1000
+          );
+      } else {
+          this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      }
+      
+      this.isOrthographic = !this.isOrthographic;
+      this.camera.position.copy(position);
+      this.camera.lookAt(target);
+
+      // Update composer passes
+      if (this.composer) {
+          this.composer.passes.forEach(pass => {
+              if (pass instanceof RenderPass || pass instanceof SSAOPass) {
+                  pass.camera = this.camera;
+              }
+          });
+      }
+      
+      // Update controls with new camera
+      const damping = this.controls.enableDamping;
+      const rotate = this.controls.autoRotate;
+      this.controls.dispose();
+      this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+      this.controls.enableDamping = damping;
+      this.controls.autoRotate = rotate;
+      this.controls.target.copy(target);
+      this.controls.update();
   }
 
   private onPointerMove(event: PointerEvent) {
@@ -225,6 +268,11 @@ export class VoxelEngine {
       const matrix = new THREE.Matrix4();
       mesh.getMatrixAt(instanceId, matrix);
       const pos = new THREE.Vector3().setFromMatrixPosition(matrix);
+
+      const materialTypeStr = Array.from(this.meshGroups.entries()).find(([k, v]) => v === mesh)?.[0];
+      if (this.onHoverChange) {
+         this.onHoverChange(materialTypeStr ? { x: Math.round(pos.x), y: Math.round(pos.y), z: Math.round(pos.z), material: materialTypeStr } : null);
+      }
       
       if (this.currentTool === BrushTool.ADD && intersect.face) {
         const normal = intersect.face.normal.clone();
@@ -254,6 +302,9 @@ export class VoxelEngine {
         this.previewVoxel.visible = false;
       }
     } else {
+       if (this.onHoverChange) {
+           this.onHoverChange(null);
+       }
        this.highlightBox.visible = false;
        
        if (this.currentTool === BrushTool.ADD) {
@@ -274,8 +325,33 @@ export class VoxelEngine {
     }
   }
   
+  private fireProjectile(event: PointerEvent) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    
+    const geom = new THREE.SphereGeometry(1.5, 16, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4, metalness: 0.8 });
+    const mesh = new THREE.Mesh(geom, mat);
+    
+    // Spawn a bit ahead of camera
+    mesh.position.copy(this.camera.position).add(this.raycaster.ray.direction.clone().multiplyScalar(5));
+    this.scene.add(mesh);
+    
+    const velocity = this.raycaster.ray.direction.clone().multiplyScalar(4.0); // Speed
+    
+    this.projectiles.push({ mesh, velocity, mass: 20 });
+    audioService.playShootSound(mesh.position.x, mesh.position.y, mesh.position.z);
+  }
+
   private onPointerDown(event: PointerEvent) {
-    if (this.state !== AppState.STABLE) return;
+    if (this.state !== AppState.STABLE) {
+        if (this.state === AppState.DISMANTLING && event.button === 0) {
+            this.fireProjectile(event);
+        }
+        return;
+    }
     if (event.button !== 0) return; // Only left click
     
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -312,6 +388,7 @@ export class VoxelEngine {
           this.voxels.splice(voxelIndex, 1);
           this.createVoxels(this.getData()); // Recreate meshes
           this.onInteraction('Removed Voxel');
+          audioService.playRemoveSound(pos.x, pos.y, pos.z);
       } else if (this.currentTool === BrushTool.PAINT) {
           // Paint voxel
           this.voxels[voxelIndex].color = new THREE.Color(this.currentColor);
@@ -342,6 +419,7 @@ export class VoxelEngine {
               
               this.createVoxels(this.getData());
               this.onInteraction('Added Voxel');
+              audioService.playPlaceSound(newPos.x, newPos.y, newPos.z);
           }
       } else if (this.currentTool === BrushTool.SCULPT) {
           // Flatten / push inwards based on normal, pull if shift key
@@ -391,6 +469,7 @@ export class VoxelEngine {
               });
               this.createVoxels(this.getData());
               this.onInteraction('Added Floor Voxel');
+              audioService.playPlaceSound(x, y, z);
             }
         }
     }
@@ -461,8 +540,6 @@ export class VoxelEngine {
         }
 
         const mesh = new THREE.InstancedMesh(geometry, material, voxels.length);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
         
         voxels.forEach((v, i) => {
             this.dummy.position.set(v.x, v.y, v.z);
@@ -526,10 +603,16 @@ export class VoxelEngine {
 
   private getColorDist(c1: THREE.Color, hex2: number): number {
     const c2 = new THREE.Color(hex2);
-    const r = (c1.r - c2.r) * 0.3;
-    const g = (c1.g - c2.g) * 0.59;
-    const b = (c1.b - c2.b) * 0.11;
-    return Math.sqrt(r * r + g * g + b * b);
+    // Redmean perceptual formula for color distance
+    const rmean = (c1.r * 255 + c2.r * 255) / 2;
+    const r = c1.r * 255 - c2.r * 255;
+    const g = c1.g * 255 - c2.g * 255;
+    const b = c1.b * 255 - c2.b * 255;
+    return Math.sqrt(
+        (((512 + rmean) * r * r) / 256) + 
+        4 * g * g + 
+        (((767 - rmean) * b * b) / 256)
+    );
   }
 
   public rebuild(targetModel: VoxelData[]) {
@@ -537,25 +620,45 @@ export class VoxelEngine {
 
     const available = this.voxels.map((v, i) => ({ index: i, color: v.color, taken: false }));
     const mappings: RebuildTarget[] = new Array(this.voxels.length).fill(null);
+    const unmatchedTargets: VoxelData[] = [];
 
-    // Simple greedy matching for colors
+    // Phase 1: Prioritize exact color matches
     targetModel.forEach(target => {
-        let bestDist = 9999;
+        let exactMatchIdx = -1;
+        const targetColorObj = new THREE.Color(target.color);
+        for (let i = 0; i < available.length; i++) {
+            if (!available[i].taken && available[i].color.equals(targetColorObj)) {
+                exactMatchIdx = i;
+                break;
+            }
+        }
+
+        if (exactMatchIdx !== -1) {
+            available[exactMatchIdx].taken = true;
+            const h = Math.max(0, (target.y - CONFIG.FLOOR_Y) / 15);
+            mappings[available[exactMatchIdx].index] = {
+                x: target.x, y: target.y, z: target.z,
+                delay: h * 800,
+                colorTransitionDelay: -1
+            };
+        } else {
+            unmatchedTargets.push(target);
+        }
+    });
+
+    // Phase 2: Sophisticated fallback using perceptual distance formula
+    unmatchedTargets.forEach(target => {
+        let bestDist = Infinity;
         let bestIdx = -1;
 
         for (let i = 0; i < available.length; i++) {
             if (available[i].taken) continue;
-
+            // Sophisticated color distance
             const d = this.getColorDist(available[i].color, target.color);
-            // Penalties for wrong material types
-            const isLeafOrWood = (available[i].color.g > 0.4) || (available[i].color.r < 0.25 && available[i].color.b < 0.25);
-            const targetIsGreen = target.color === COLORS.GREEN || target.color === COLORS.WOOD;
-            const penalty = (isLeafOrWood && !targetIsGreen) ? 100 : 0;
 
-            if (d + penalty < bestDist) {
-                bestDist = d + penalty;
+            if (d < bestDist) {
+                bestDist = d;
                 bestIdx = i;
-                if (d < 0.01) break; // Perfect match
             }
         }
 
@@ -564,7 +667,9 @@ export class VoxelEngine {
             const h = Math.max(0, (target.y - CONFIG.FLOOR_Y) / 15);
             mappings[available[bestIdx].index] = {
                 x: target.x, y: target.y, z: target.z,
-                delay: h * 800
+                delay: h * 800,
+                colorTransitionDelay: h * 800 + 400, // Trigger color transition midway
+                targetColor: target.color
             };
         }
     });
@@ -599,6 +704,103 @@ export class VoxelEngine {
     }
 
     if (this.state === AppState.DISMANTLING) {
+        // Projectile physics
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.mesh.position.add(p.velocity);
+            p.velocity.y += this.physicsConfig.gravity * 0.01;
+            
+            // Floor bounce
+            if (p.mesh.position.y < CONFIG.FLOOR_Y + 1.5) {
+                p.mesh.position.y = CONFIG.FLOOR_Y + 1.5;
+                p.velocity.y *= -0.5;
+                p.velocity.x *= 0.8;
+                p.velocity.z *= 0.8;
+                if (p.velocity.lengthSq() < 0.1) {
+                    this.scene.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    (p.mesh.material as THREE.Material).dispose();
+                    this.projectiles.splice(i, 1);
+                    continue;
+                }
+            }
+
+            // Voxel collisions
+            this.voxels.forEach(v => {
+                const distSq = (v.x - p.mesh.position.x)**2 + (v.y - p.mesh.position.y)**2 + (v.z - p.mesh.position.z)**2;
+                if (distSq < 4.0) { // Collision Radius ~ 2.0
+                    // Apply force
+                    const forceDir = new THREE.Vector3(v.x - p.mesh.position.x, v.y - p.mesh.position.y, v.z - p.mesh.position.z).normalize();
+                    const forceMag = p.velocity.length() * p.mass / 2; // Transfer some momentum
+                    v.vx += forceDir.x * forceMag;
+                    v.vy += forceDir.y * forceMag;
+                    v.vz += forceDir.z * forceMag;
+                    v.rvx = (Math.random() - 0.5) * forceMag;
+                    v.rvy = (Math.random() - 0.5) * forceMag;
+                    v.rvz = (Math.random() - 0.5) * forceMag;
+                    
+                    // Slow down projectile
+                    p.velocity.multiplyScalar(0.9);
+                    
+                    audioService.playCrashSound(v.x, v.y, v.z, Math.min(1.0, forceMag));
+                }
+            });
+        }
+
+        // Voxel-to-voxel collisions
+        const numVoxels = this.voxels.length;
+        const voxelRad = CONFIG.VOXEL_SIZE / 2 * 0.9; // slight reduction for stability
+        const collisionDistSq = (voxelRad * 2) ** 2;
+        for (let i = 0; i < numVoxels; i++) {
+            const v1 = this.voxels[i];
+            // Only run collisions if they are reasonably close to the floor or moving, to save perf
+            if (v1.y > CONFIG.FLOOR_Y + 10 && Math.abs(v1.vy) < 0.1) continue; 
+            for (let j = i + 1; j < numVoxels; j++) {
+                const v2 = this.voxels[j];
+                const dx = v2.x - v1.x;
+                const dy = v2.y - v1.y;
+                const dz = v2.z - v1.z;
+                // Quick bounding box check first
+                if (Math.abs(dx) > voxelRad * 2 || Math.abs(dy) > voxelRad * 2 || Math.abs(dz) > voxelRad * 2) continue;
+                
+                const distSq = dx * dx + dy * dy + dz * dz;
+                if (distSq < collisionDistSq && distSq > 0) {
+                    const dist = Math.sqrt(distSq);
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    const nz = dz / dist;
+                    
+                    // Separate them
+                    const overlap = (voxelRad * 2) - dist;
+                    const sepPx = nx * overlap * 0.5;
+                    const sepPy = ny * overlap * 0.5;
+                    const sepPz = nz * overlap * 0.5;
+                    
+                    v1.x -= sepPx; v1.y -= sepPy; v1.z -= sepPz;
+                    v2.x += sepPx; v2.y += sepPy; v2.z += sepPz;
+                    
+                    // Velocity reflection (simple elastic collision)
+                    const rvx = v2.vx - v1.vx;
+                    const rvy = v2.vy - v1.vy;
+                    const rvz = v2.vz - v1.vz;
+                    
+                    const velAlongNormal = rvx * nx + rvy * ny + rvz * nz;
+                    if (velAlongNormal > 0) continue; // Moving apart
+                    
+                    const e = this.physicsConfig.bounce * 0.5; // less bouncy for voxels
+                    const jForce = -(1 + e) * velAlongNormal;
+                    const impulseMag = jForce / 2;
+                    
+                    const ix = nx * impulseMag;
+                    const iy = ny * impulseMag;
+                    const iz = nz * impulseMag;
+                    
+                    v1.vx -= ix; v1.vy -= iy; v1.vz -= iz;
+                    v2.vx += ix; v2.vy += iy; v2.vz += iz;
+                }
+            }
+        }
+
         this.voxels.forEach(v => {
             v.vy += this.physicsConfig.gravity * 0.01; // Gravity
             v.x += v.vx; v.y += v.vy; v.z += v.vz;
@@ -606,6 +808,9 @@ export class VoxelEngine {
 
             // Floor bounce
             if (v.y < CONFIG.FLOOR_Y + 0.5) {
+                if (v.vy < -0.2) {
+                    audioService.playCrashSound(v.x, v.y, v.z, Math.abs(v.vy) * 0.5);
+                }
                 v.y = CONFIG.FLOOR_Y + 0.5;
                 v.vy *= -this.physicsConfig.bounce;
                 v.vx *= this.physicsConfig.friction; 
@@ -638,13 +843,23 @@ export class VoxelEngine {
             v.ry += (0 - v.ry) * 0.2;
             v.rz += (0 - v.rz) * 0.2;
 
+            if (t.colorTransitionDelay !== undefined && elapsed > t.colorTransitionDelay && t.targetColor !== undefined) {
+                const targetColor = new THREE.Color(t.targetColor);
+                v.color.lerp(targetColor, 0.15);
+            }
+
             // Check if reached
-            if ((t.x - v.x) ** 2 + (t.y - v.y) ** 2 + (t.z - v.z) ** 2 > 0.01) {
+            const posDistSq = (t.x - v.x) ** 2 + (t.y - v.y) ** 2 + (t.z - v.z) ** 2;
+            const colorDistSq = t.targetColor !== undefined ? 
+                (v.color.r - new THREE.Color(t.targetColor).r)**2 + (v.color.g - new THREE.Color(t.targetColor).g)**2 + (v.color.b - new THREE.Color(t.targetColor).b)**2 : 0;
+            
+            if (posDistSq > 0.01 || colorDistSq > 0.001) {
                 allDone = false;
             } else {
                 // Snap to grid
                 v.x = t.x; v.y = t.y; v.z = t.z;
                 v.rx = 0; v.ry = 0; v.rz = 0;
+                if (t.targetColor !== undefined) v.color.setHex(t.targetColor);
             }
         });
 
@@ -658,6 +873,16 @@ export class VoxelEngine {
   private animate() {
     this.animationId = requestAnimationFrame(this.animate);
     this.controls.update();
+
+    if (this.camera) {
+        const camDir = new THREE.Vector3();
+        this.camera.getWorldDirection(camDir);
+        audioService.updateListener(
+            this.camera.position.x, this.camera.position.y, this.camera.position.z,
+            camDir.x, camDir.y, camDir.z
+        );
+    }
+
     this.updatePhysics();
     
     // Optimize: only draw if moving
@@ -665,14 +890,24 @@ export class VoxelEngine {
         this.draw();
     }
     
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   public handleResize() {
       if (this.camera && this.renderer) {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
+        const aspect = window.innerWidth / window.innerHeight;
+        if (this.camera instanceof THREE.PerspectiveCamera) {
+            this.camera.aspect = aspect;
+        } else if (this.camera instanceof THREE.OrthographicCamera) {
+            const frustumSize = (this.camera.top - this.camera.bottom);
+            this.camera.left = -frustumSize * aspect / 2;
+            this.camera.right = frustumSize * aspect / 2;
+        }
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        if (this.composer) {
+            this.composer.setSize(window.innerWidth, window.innerHeight);
+        }
       }
   }
   
@@ -700,6 +935,79 @@ export class VoxelEngine {
         colors.add('#' + v.color.getHexString());
     });
     return Array.from(colors);
+  }
+
+  public setEnvironment(env: 'day' | 'night' | 'sunset') {
+      switch (env) {
+          case 'day':
+              this.scene.background = new THREE.Color(0xf1f5f9);
+              this.scene.fog = new THREE.Fog(0xf1f5f9, 50, 150);
+              this.ambientLight.color.setHex(0xffffff);
+              this.ambientLight.intensity = 0.7;
+              this.dirLight.color.setHex(0xffffff);
+              this.dirLight.intensity = 1.5;
+              this.dirLight.position.set(50, 80, 30);
+              (this.floorMesh.material as THREE.MeshStandardMaterial).color.setHex(0xe2e8f0);
+              break;
+          case 'night':
+              this.scene.background = new THREE.Color(0x0f172a);
+              this.scene.fog = new THREE.Fog(0x0f172a, 30, 100);
+              this.ambientLight.color.setHex(0x1e293b);
+              this.ambientLight.intensity = 0.4;
+              this.dirLight.color.setHex(0x2d3748);
+              this.dirLight.intensity = 0.8;
+              this.dirLight.position.set(-50, 40, -30);
+              (this.floorMesh.material as THREE.MeshStandardMaterial).color.setHex(0x1e293b);
+              break;
+          case 'sunset':
+              this.scene.background = new THREE.Color(0xffedd5);
+              this.scene.fog = new THREE.Fog(0xffedd5, 40, 120);
+              this.ambientLight.color.setHex(0xffedd5);
+              this.ambientLight.intensity = 0.6;
+              this.dirLight.color.setHex(0xf97316);
+              this.dirLight.intensity = 1.6;
+              this.dirLight.position.set(100, 20, 50); // Low angle
+              (this.floorMesh.material as THREE.MeshStandardMaterial).color.setHex(0xffedd5);
+              break;
+      }
+  }
+
+  public exportGLTF() {
+      const exportScene = new THREE.Scene();
+      const geom = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
+      
+      this.voxels.forEach(v => {
+          const mat = new THREE.MeshStandardMaterial({
+              color: v.color,
+              roughness: this.materialConfig[v.material]?.roughness ?? 0.8,
+              metalness: this.materialConfig[v.material]?.metalness ?? 0.1
+          });
+          const mesh = new THREE.Mesh(geom, mat);
+          mesh.position.set(v.x, v.y, v.z);
+          mesh.rotation.set(v.rx, v.ry, v.rz);
+          exportScene.add(mesh);
+      });
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+          exportScene,
+          (gltf) => {
+              const output = JSON.stringify(gltf, null, 2);
+              const blob = new Blob([output], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.style.display = 'none';
+              link.href = url;
+              link.download = 'voxel-model.gltf';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+          },
+          (error) => {
+              console.error('An error happened during GLTF export:', error);
+          },
+          { binary: false }
+      );
   }
 
   public cleanup() {

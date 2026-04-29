@@ -62,6 +62,8 @@ export interface RebuildTarget {
   z: number;
   delay: number;
   isRubble?: boolean;
+  colorTransitionDelay?: number;
+  targetColor?: number;
 }
 
 export interface SavedModel {

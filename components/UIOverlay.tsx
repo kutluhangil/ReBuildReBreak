@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, SavedModel, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap } from '../types';
-import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2, Trash2 } from 'lucide-react';
+import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2, Trash2, Home, Bot, Trees, Download, Sun, Moon, Sunrise, Camera, Maximize, View } from 'lucide-react';
 import { MaterialPreview } from './MaterialPreview';
 
 interface UIOverlayProps {
@@ -9,6 +9,7 @@ interface UIOverlayProps {
   currentBaseModel: string;
   customBuilds: SavedModel[];
   customRebuilds: SavedModel[];
+  hoveredVoxel?: { x: number, y: number, z: number, material: string } | null;
   isAutoRotate: boolean;
   isInfoVisible: boolean;
   isGenerating: boolean;
@@ -22,10 +23,11 @@ interface UIOverlayProps {
   physicsConfig: PhysicsConfig;
   sculptSettings: SculptSettings;
   materialConfig: MaterialConfigMap;
+  environment: 'day' | 'night' | 'sunset';
   
   onDismantle: () => void;
-  onRebuild: (type: 'Eagle' | 'Cat' | 'Rabbit' | 'Twins') => void;
-  onNewScene: (type: 'Eagle') => void;
+  onRebuild: (type: string) => void;
+  onNewScene: (type: string) => void;
   onSelectCustomBuild: (model: SavedModel) => void;
   onSelectCustomRebuild: (model: SavedModel) => void;
   onEditBuild: (model: SavedModel) => void;
@@ -33,6 +35,10 @@ interface UIOverlayProps {
   onPromptMorph: () => void;
   onShowJson: () => void;
   onImportJson: () => void;
+  onExportGLTF: () => void;
+  onResetCamera: () => void;
+  onZoomToFit: () => void;
+  onToggleCameraProjection: () => void;
   onToggleRotation: () => void;
   onToggleInfo: () => void;
   
@@ -41,6 +47,7 @@ interface UIOverlayProps {
   onMaterialChange: (material: MaterialType) => void;
   onGridSnapToggle: () => void;
   onPhysicsConfigChange: (config: PhysicsConfig) => void;
+  onEnvironmentChange: (env: 'day' | 'night' | 'sunset') => void;
   onPhysicsPanelToggle?: (isOpen: boolean) => void;
   onClear: () => void;
   onSculptSettingsChange: (settings: SculptSettings) => void;
@@ -64,6 +71,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   currentBaseModel,
   customBuilds,
   customRebuilds,
+  hoveredVoxel,
   isAutoRotate,
   isInfoVisible,
   isGenerating,
@@ -77,6 +85,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   physicsConfig,
   sculptSettings,
   materialConfig,
+  environment,
   
   onDismantle,
   onRebuild,
@@ -88,6 +97,10 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onPromptMorph,
   onShowJson,
   onImportJson,
+  onExportGLTF,
+  onResetCamera,
+  onZoomToFit,
+  onToggleCameraProjection,
   onToggleRotation,
   onToggleInfo,
   
@@ -98,6 +111,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onRedo,
   onGridSnapToggle,
   onPhysicsConfigChange,
+  onEnvironmentChange,
   onPhysicsPanelToggle,
   onClear,
   onSculptSettingsChange,
@@ -175,7 +189,13 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             >
                 <div className="px-2 py-1 text-xs font-bold text-slate-400 uppercase tracking-wider">NEW BUILDS</div>
                 <DropdownItem onClick={() => onNewScene('Eagle')} icon={<Bird size={16}/>} label="Eagle" />
-                <DropdownItem onClick={onPromptCreate} icon={<Wand2 size={16}/>} label="New build" highlight />
+                <DropdownItem onClick={() => onNewScene('Cat')} icon={<Cat size={16}/>} label="Cat" />
+                <DropdownItem onClick={() => onNewScene('Terrain')} icon={<Trees size={16}/>} label="Terrain" />
+                <DropdownItem onClick={() => onNewScene('Rabbit')} icon={<Rabbit size={16}/>} label="Rabbit" />
+                <DropdownItem onClick={() => onNewScene('Twins')} icon={<Users size={16}/>} label="Twins" />
+                <DropdownItem onClick={() => onNewScene('Robot')} icon={<Bot size={16}/>} label="Robot" />
+                <DropdownItem onClick={() => onNewScene('House')} icon={<Home size={16}/>} label="House" />
+                <DropdownItem onClick={onPromptCreate} icon={<Wand2 size={16}/>} label="AI Generated" highlight />
                 <div className="h-px bg-slate-100 my-1" />
                 
                 {Object.entries(buildsByFolder).map(([folder, builds]) => (
@@ -199,6 +219,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 {customBuilds.length > 0 && <div className="h-px bg-slate-100 my-1" />}
 
                 <DropdownItem onClick={onImportJson} icon={<FileJson size={16}/>} label="Import JSON" />
+                <DropdownItem onClick={onExportGLTF} icon={<Download size={16}/>} label="Export GLTF" />
             </DropdownMenu>
 
             <div className="flex items-center gap-3 px-4 py-2 bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-slate-200 text-slate-500 font-bold w-fit mt-2">
@@ -228,6 +249,39 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
         {/* Right Utilities */}
         <div className="pointer-events-auto flex gap-2">
+            <TactileButton
+                onClick={onResetCamera}
+                color="slate"
+                icon={<Camera size={18} strokeWidth={2.5} />}
+                label="Reset"
+                compact
+            />
+            <TactileButton
+                onClick={onZoomToFit}
+                color="slate"
+                icon={<Maximize size={18} strokeWidth={2.5} />}
+                label="Fit"
+                compact
+            />
+            <TactileButton
+                onClick={onToggleCameraProjection}
+                color="slate"
+                icon={<View size={18} strokeWidth={2.5} />}
+                label="Proj"
+                compact
+            />
+            
+            <TactileButton
+                onClick={() => {
+                    if (environment === 'day') onEnvironmentChange('sunset');
+                    else if (environment === 'sunset') onEnvironmentChange('night');
+                    else onEnvironmentChange('day');
+                }}
+                color={environment === 'day' ? 'sky' : environment === 'sunset' ? 'orange' : 'indigo'}
+                icon={environment === 'day' ? <Sun size={18} strokeWidth={2.5} /> : environment === 'sunset' ? <Sunrise size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
+                label={environment.charAt(0).toUpperCase() + environment.slice(1)}
+                compact
+            />
             <TactileButton
                 onClick={() => { setShowMaterialPanel(!showMaterialPanel); setShowPhysicsPanel(false); setShowPalettePanel(false); }}
                 color={showMaterialPanel ? 'purple' : 'slate'}
@@ -307,14 +361,14 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
             {/* Materials */}
             {currentTool !== BrushTool.REMOVE && currentTool !== BrushTool.SCULPT && (
-                <div className="bg-white/90 backdrop-blur p-2 rounded-2xl shadow-xl flex flex-col gap-2 border-2 border-slate-200 mt-2 max-h-48 overflow-y-auto">
-                    <MaterialButton active={currentMaterial===MaterialType.SOLID} onClick={() => onMaterialChange(MaterialType.SOLID)} label="Solid" />
-                    <MaterialButton active={currentMaterial===MaterialType.METAL} onClick={() => onMaterialChange(MaterialType.METAL)} label="Metal" />
-                    <MaterialButton active={currentMaterial===MaterialType.WOOD} onClick={() => onMaterialChange(MaterialType.WOOD)} label="Wood" />
-                    <MaterialButton active={currentMaterial===MaterialType.GLASS} onClick={() => onMaterialChange(MaterialType.GLASS)} label="Glass" />
-                    <MaterialButton active={currentMaterial===MaterialType.STONE} onClick={() => onMaterialChange(MaterialType.STONE)} label="Stone" />
-                    <MaterialButton active={currentMaterial===MaterialType.PLASTIC} onClick={() => onMaterialChange(MaterialType.PLASTIC)} label="Plastic" />
-                    <MaterialButton active={currentMaterial===MaterialType.FABRIC} onClick={() => onMaterialChange(MaterialType.FABRIC)} label="Fabric" />
+                <div className="bg-white/90 backdrop-blur p-2 rounded-2xl shadow-xl flex flex-col gap-2 border-2 border-slate-200 mt-2 max-h-56 overflow-y-auto w-36">
+                    <MaterialButton type={MaterialType.SOLID} active={currentMaterial===MaterialType.SOLID} onClick={() => onMaterialChange(MaterialType.SOLID)} label="Solid" />
+                    <MaterialButton type={MaterialType.METAL} active={currentMaterial===MaterialType.METAL} onClick={() => onMaterialChange(MaterialType.METAL)} label="Metal" />
+                    <MaterialButton type={MaterialType.WOOD} active={currentMaterial===MaterialType.WOOD} onClick={() => onMaterialChange(MaterialType.WOOD)} label="Wood" />
+                    <MaterialButton type={MaterialType.GLASS} active={currentMaterial===MaterialType.GLASS} onClick={() => onMaterialChange(MaterialType.GLASS)} label="Glass" />
+                    <MaterialButton type={MaterialType.STONE} active={currentMaterial===MaterialType.STONE} onClick={() => onMaterialChange(MaterialType.STONE)} label="Stone" />
+                    <MaterialButton type={MaterialType.PLASTIC} active={currentMaterial===MaterialType.PLASTIC} onClick={() => onMaterialChange(MaterialType.PLASTIC)} label="Plastic" />
+                    <MaterialButton type={MaterialType.FABRIC} active={currentMaterial===MaterialType.FABRIC} onClick={() => onMaterialChange(MaterialType.FABRIC)} label="Fabric" />
                 </div>
             )}
             
@@ -356,6 +410,17 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                             + Save Color
                         </button>
                     </div>
+                </div>
+            )}
+            
+            {/* Hover Info Panel */}
+            {hoveredVoxel && (currentTool === BrushTool.PAINT || currentTool === BrushTool.SCULPT || currentTool === BrushTool.REMOVE) && (
+                <div className="bg-white/95 backdrop-blur p-3 rounded-2xl shadow-xl flex flex-col gap-1 border-2 border-slate-200 mt-2 text-xs font-mono text-slate-700 w-32">
+                   <div className="font-bold text-slate-400 uppercase tracking-wider mb-1 border-b border-slate-100 pb-1">Voxel Info</div>
+                   <div className="flex justify-between"><span className="text-slate-400">X:</span> {hoveredVoxel.x}</div>
+                   <div className="flex justify-between"><span className="text-slate-400">Y:</span> {hoveredVoxel.y}</div>
+                   <div className="flex justify-between"><span className="text-slate-400">Z:</span> {hoveredVoxel.z}</div>
+                   <div className="mt-1 pt-1 border-t border-slate-100 font-bold capitalize text-indigo-500 truncate" title={hoveredVoxel.material}>{hoveredVoxel.material}</div>
                 </div>
             )}
         </div>
@@ -439,32 +504,89 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                   <span className="text-sm font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-wider">{currentMaterial}</span>
               </div>
               
-              <div className="flex flex-col gap-4 mt-2">
-                  <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Roughness</span><span>{(materialConfig[currentMaterial]?.roughness ?? 0.8).toFixed(2)}</span></div>
-                      <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.roughness ?? 0.8} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], roughness: parseFloat(e.target.value) }})} className="accent-purple-500" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Metalness</span><span>{(materialConfig[currentMaterial]?.metalness ?? 0.1).toFixed(2)}</span></div>
-                      <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.metalness ?? 0.1} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], metalness: parseFloat(e.target.value) }})} className="accent-purple-500" />
-                  </div>
-                  {currentMaterial === MaterialType.GLASS && (
-                      <div className="flex flex-col gap-1">
-                          <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Transmission</span><span>{(materialConfig[currentMaterial]?.transmission ?? 0.9).toFixed(2)}</span></div>
-                          <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.transmission ?? 0.9} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], transmission: parseFloat(e.target.value) }})} className="accent-purple-500" />
+              {(() => {
+                  const presets: {label: string, config: any}[] = [];
+                  if (currentMaterial === MaterialType.METAL) {
+                      presets.push({label: 'Brushed', config: { roughness: 0.4, metalness: 0.9 }});
+                      presets.push({label: 'Polished', config: { roughness: 0.1, metalness: 1.0 }});
+                      presets.push({label: 'Rusty', config: { roughness: 0.8, metalness: 0.6 }});
+                  } else if (currentMaterial === MaterialType.GLASS) {
+                      presets.push({label: 'Clear', config: { roughness: 0.05, metalness: 0.1, transmission: 0.95 }});
+                      presets.push({label: 'Frosted', config: { roughness: 0.4, metalness: 0.1, transmission: 0.8 }});
+                      presets.push({label: 'Tinted', config: { roughness: 0.1, metalness: 0.3, transmission: 0.6 }});
+                  } else if (currentMaterial === MaterialType.STONE) {
+                      presets.push({label: 'Rough Concrete', config: { roughness: 0.95, metalness: 0.05 }});
+                      presets.push({label: 'Polished Marble', config: { roughness: 0.1, metalness: 0.1 }});
+                  } else if (currentMaterial === MaterialType.PLASTIC) {
+                      presets.push({label: 'Shiny', config: { roughness: 0.2, metalness: 0.0, clearcoat: 1.0 }});
+                      presets.push({label: 'Matte', config: { roughness: 0.7, metalness: 0.0, clearcoat: 0.1 }});
+                  } else if (currentMaterial === MaterialType.WOOD) {
+                      presets.push({label: 'Varnished', config: { roughness: 0.3, metalness: 0.0 }});
+                      presets.push({label: 'Raw', config: { roughness: 0.85, metalness: 0.0 }});
+                  }
+                  
+                  if (presets.length === 0) return null;
+                  
+                  return (
+                       <div className="flex flex-wrap gap-1.5 justify-center mt-1">
+                           {presets.map(p => (
+                               <button 
+                                  key={p.label}
+                                  className="text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-purple-100 hover:text-purple-600 px-2 py-1 rounded transition-colors"
+                                  onClick={() => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], ...p.config }})}
+                               >
+                                   {p.label}
+                               </button>
+                           ))}
+                       </div>
+                  );
+              })()}
+
+              <div className="flex flex-col gap-2 mt-2">
+                  <details className="group border border-slate-200 rounded-xl overflow-hidden [&_summary::-webkit-details-marker]:hidden bg-slate-50">
+                      <summary className="flex items-center justify-between cursor-pointer p-3 font-bold text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+                          <span title="Base surface parameters that affect how light scatters">Core Properties</span>
+                          <span className="transition group-open:rotate-180"><ChevronUp size={16} /></span>
+                      </summary>
+                      <div className="p-3 pt-1 flex flex-col gap-4 bg-white border-t border-slate-100">
+                          <div className="flex flex-col gap-1" title="Roughness determines how scattered light gets when bouncing off the surface. 0 means perfectly smooth like a mirror, 1 means completely rough like chalk.">
+                              <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Roughness</span><span>{(materialConfig[currentMaterial]?.roughness ?? 0.8).toFixed(2)}</span></div>
+                              <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.roughness ?? 0.8} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], roughness: parseFloat(e.target.value) }})} className="accent-purple-500" />
+                          </div>
+                          <div className="flex flex-col gap-1" title="Metalness makes a material look more like a metal rather than a dielectric material like plastic or wood.">
+                              <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Metalness</span><span>{(materialConfig[currentMaterial]?.metalness ?? 0.1).toFixed(2)}</span></div>
+                              <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.metalness ?? 0.1} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], metalness: parseFloat(e.target.value) }})} className="accent-purple-500" />
+                          </div>
                       </div>
-                  )}
-                  {currentMaterial === MaterialType.PLASTIC && (
-                      <div className="flex flex-col gap-1">
-                          <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Clearcoat</span><span>{(materialConfig[currentMaterial]?.clearcoat ?? 1.0).toFixed(2)}</span></div>
-                          <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.clearcoat ?? 1.0} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], clearcoat: parseFloat(e.target.value) }})} className="accent-purple-500" />
-                      </div>
-                  )}
-                  {currentMaterial === MaterialType.FABRIC && (
-                      <div className="flex flex-col gap-1">
-                          <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Sheen</span><span>{(materialConfig[currentMaterial]?.sheen ?? 1.0).toFixed(2)}</span></div>
-                          <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.sheen ?? 1.0} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], sheen: parseFloat(e.target.value) }})} className="accent-purple-500" />
-                      </div>
+                  </details>
+
+                  {(currentMaterial === MaterialType.GLASS || currentMaterial === MaterialType.PLASTIC || currentMaterial === MaterialType.FABRIC) && (
+                      <details className="group border border-slate-200 rounded-xl overflow-hidden [&_summary::-webkit-details-marker]:hidden bg-slate-50">
+                          <summary className="flex items-center justify-between cursor-pointer p-3 font-bold text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+                              <span title="Advanced parameters specific to this material type">Advanced Properties</span>
+                              <span className="transition group-open:rotate-180"><ChevronUp size={16} /></span>
+                          </summary>
+                          <div className="p-3 pt-1 flex flex-col gap-4 bg-white border-t border-slate-100">
+                              {currentMaterial === MaterialType.GLASS && (
+                                  <div className="flex flex-col gap-1" title="Transmission controls how much light passes through the surface, giving the effect of glass.">
+                                      <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Transmission</span><span>{(materialConfig[currentMaterial]?.transmission ?? 0.9).toFixed(2)}</span></div>
+                                      <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.transmission ?? 0.9} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], transmission: parseFloat(e.target.value) }})} className="accent-purple-500" />
+                                  </div>
+                              )}
+                              {currentMaterial === MaterialType.PLASTIC && (
+                                  <div className="flex flex-col gap-1" title="Clearcoat adds a transparent reflective layer on top of the base material, similar to car paint.">
+                                      <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Clearcoat</span><span>{(materialConfig[currentMaterial]?.clearcoat ?? 1.0).toFixed(2)}</span></div>
+                                      <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.clearcoat ?? 1.0} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], clearcoat: parseFloat(e.target.value) }})} className="accent-purple-500" />
+                                  </div>
+                              )}
+                              {currentMaterial === MaterialType.FABRIC && (
+                                  <div className="flex flex-col gap-1" title="Sheen adds a soft reflection at grazing angles, characteristic of cloth and velvet materials.">
+                                      <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Sheen</span><span>{(materialConfig[currentMaterial]?.sheen ?? 1.0).toFixed(2)}</span></div>
+                                      <input type="range" min="0" max="1" step="0.05" value={materialConfig[currentMaterial]?.sheen ?? 1.0} onChange={(e) => onMaterialConfigChange({...materialConfig, [currentMaterial]: { ...materialConfig[currentMaterial], sheen: parseFloat(e.target.value) }})} className="accent-purple-500" />
+                                  </div>
+                              )}
+                          </div>
+                      </details>
                   )}
               </div>
           </div>
@@ -521,14 +643,14 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                      >
                         <div className="px-2 py-1 text-xs font-bold text-slate-400 uppercase tracking-wider">REBUILD</div>
                         
-                        {isEagle && (
-                            <>
-                                <DropdownItem onClick={() => onRebuild('Cat')} icon={<Cat size={18}/>} label="Cat" />
-                                <DropdownItem onClick={() => onRebuild('Rabbit')} icon={<Rabbit size={18}/>} label="Rabbit" />
-                                <DropdownItem onClick={() => onRebuild('Twins')} icon={<Users size={18}/>} label="Eagles x2" />
-                                <div className="h-px bg-slate-100 my-1" />
-                            </>
-                        )}
+                        <DropdownItem onClick={() => onRebuild('Eagle')} icon={<Bird size={18}/>} label="Eagle" />
+                        <DropdownItem onClick={() => onRebuild('Cat')} icon={<Cat size={18}/>} label="Cat" />
+                        <DropdownItem onClick={() => onRebuild('Rabbit')} icon={<Rabbit size={18}/>} label="Rabbit" />
+                        <DropdownItem onClick={() => onRebuild('Twins')} icon={<Users size={18}/>} label="Eagles x2" />
+                        <DropdownItem onClick={() => onRebuild('Tree')} icon={<Trees size={18}/>} label="Tree" />
+                        <DropdownItem onClick={() => onRebuild('House')} icon={<Home size={18}/>} label="House" />
+                        <DropdownItem onClick={() => onRebuild('Robot')} icon={<Bot size={18}/>} label="Robot" />
+                        <div className="h-px bg-slate-100 my-1" />
 
                         {Object.entries(rebuildsByFolder).map(([folder, builds]) => (
                             <div key={folder} className="mb-2">
@@ -574,12 +696,41 @@ const ToolButton: React.FC<{icon: React.ReactNode, active: boolean, onClick: () 
     )
 }
 
-const MaterialButton: React.FC<{label: string, active: boolean, onClick: () => void}> = ({label, active, onClick}) => {
+const MaterialButton: React.FC<{
+    label: string, 
+    active: boolean, 
+    onClick: () => void,
+    type: MaterialType
+}> = ({label, active, onClick, type}) => {
+    
+    // Generate a small CSS preview depending on material type
+    const getPreview = () => {
+        switch(type) {
+            case MaterialType.SOLID:
+                return <div className="w-5 h-5 rounded-md bg-slate-500 shadow-sm border border-slate-600" />;
+            case MaterialType.METAL:
+                return <div className="w-5 h-5 rounded-md bg-gradient-to-br from-slate-200 via-slate-400 to-slate-600 shadow-sm border border-slate-400" />;
+            case MaterialType.WOOD:
+                return <div className="w-5 h-5 rounded-md bg-amber-700 shadow-sm border border-amber-900 bg-[repeating-linear-gradient(45deg,transparent,transparent_2px,rgba(0,0,0,0.1)_2px,rgba(0,0,0,0.1)_4px)]" />;
+            case MaterialType.GLASS:
+                return <div className="w-5 h-5 rounded-md bg-sky-200/40 shadow-sm border-2 border-sky-300/50 backdrop-blur-sm" />;
+            case MaterialType.STONE:
+                return <div className="w-5 h-5 rounded-md bg-stone-500 shadow-sm border border-stone-600 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.1)_1px,transparent_1px)] bg-[size:4px_4px]" />;
+            case MaterialType.PLASTIC:
+                return <div className="w-5 h-5 rounded-md bg-pink-400 shadow-sm border border-pink-500 saturate-150" />;
+            case MaterialType.FABRIC:
+                return <div className="w-5 h-5 rounded-md bg-indigo-400 shadow-sm border border-indigo-500 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(255,255,255,0.2)_2px,rgba(255,255,255,0.2)_4px)]" />;
+            default:
+                return <div className="w-5 h-5 rounded-md bg-gray-500" />;
+        }
+    }
+
     return (
         <button 
             onClick={onClick}
-            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${active ? 'bg-slate-800 text-white' : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}
+            className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-all ${active ? 'bg-slate-800 text-white shadow-md scale-105' : 'bg-transparent text-slate-600 hover:bg-slate-100'}`}
         >
+            {getPreview()}
             {label}
         </button>
     )

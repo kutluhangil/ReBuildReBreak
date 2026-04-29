@@ -5,7 +5,7 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { Play, Sparkles, Box, Wand2, Orbit, Bird, Cat, Rabbit, Hammer } from 'lucide-react';
+import { Play, Sparkles, Box, Wand2, Orbit, Bird, Cat, Rabbit, Hammer, Trees, Bot, Home } from 'lucide-react';
 
 interface WelcomeScreenProps {
   visible: boolean;
@@ -15,12 +15,12 @@ interface WelcomeScreenProps {
 const cardContent = [
     { icon: <Bird size={24} className="text-emerald-500" />, title: "Eagle", color: "bg-emerald-100" },
     { icon: <Cat size={24} className="text-amber-500" />, title: "Cat", color: "bg-amber-100" },
-    { icon: <Box size={24} className="text-indigo-500" />, title: "Custom", color: "bg-indigo-100" },
+    { icon: <Trees size={24} className="text-emerald-500" />, title: "Terrain", color: "bg-emerald-100" },
     { icon: <Rabbit size={24} className="text-rose-500" />, title: "Rabbit", color: "bg-rose-100" },
     { icon: <Wand2 size={24} className="text-purple-500" />, title: "AI Gen", color: "bg-purple-100" },
-    { icon: <Bird size={24} className="text-sky-500" />, title: "Bird", color: "bg-sky-100" },
+    { icon: <Bot size={24} className="text-sky-500" />, title: "Robot", color: "bg-sky-100" },
     { icon: <Hammer size={24} className="text-slate-500" />, title: "Tools", color: "bg-slate-100" },
-    { icon: <Cat size={24} className="text-orange-500" />, title: "Twins", color: "bg-orange-100" }
+    { icon: <Home size={24} className="text-orange-500" />, title: "House", color: "bg-orange-100" }
 ];
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss }) => {

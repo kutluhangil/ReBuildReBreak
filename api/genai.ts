@@ -1,9 +1,29 @@
-import { VercelRequest, VercelResponse } from "@vercel/node";
 import { GoogleGenAI, Type } from "@google/genai";
+import type { IncomingMessage, ServerResponse } from "http";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(
+  req: IncomingMessage & { body?: any; method?: string },
+  res: ServerResponse & {
+    status?: (code: number) => ServerResponse;
+    json?: (data: any) => void;
+  },
+) {
+  // Helper to send JSON response
+  if (!res.json) {
+    (res as any).json = function (data: any) {
+      this.setHeader("Content-Type", "application/json");
+      this.end(JSON.stringify(data));
+    };
+  }
+  if (!res.status) {
+    (res as any).status = function (code: number) {
+      this.statusCode = code;
+      return this;
+    };
+  }
+
   if (req.method !== "POST") {
-    res.status(405).json({ error: "Method not allowed" });
+    (res as any).status(405).json({ error: "Method not allowed" });
     return;
   }
 
@@ -16,7 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    res.status(500).json({ error: "GEMINI_API_KEY not configured on server" });
+    (res as any)
+      .status(500)
+      .json({ error: "GEMINI_API_KEY not configured on server" });
     return;
   }
 
@@ -85,20 +107,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Forward the parsed JSON back to the client
       try {
         const parsed = JSON.parse(response.text);
-        res.status(200).json({ data: parsed });
+        (res as any).status(200).json({ data: parsed });
       } catch (err) {
-        res
-          .status(500)
-          .json({
-            error: "Failed to parse model response",
-            raw: response.text,
-          });
+        (res as any).status(500).json({
+          error: "Failed to parse model response",
+          raw: response.text,
+        });
       }
     } else {
-      res.status(500).json({ error: "No response from model" });
+      (res as any).status(500).json({ error: "No response from model" });
     }
   } catch (err: any) {
     console.error("GenAI error", err);
-    res.status(500).json({ error: err.message || String(err) });
+    (res as any).status(500).json({ error: err.message || String(err) });
   }
 }

@@ -21,22 +21,35 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss }) => {
   const [contentIn, setContentIn] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
   const { lang, setLang, t } = useLanguage();
 
   useEffect(() => {
     if (visible) {
+      setDismissing(false);
       const id = window.requestAnimationFrame(() => setContentIn(true));
       return () => window.cancelAnimationFrame(id);
     }
     setContentIn(false);
   }, [visible]);
 
+  const handleStart = () => {
+    if (dismissing) return;
+    setDismissing(true);
+    window.setTimeout(() => onDismiss(), 850);
+  };
+
   if (!visible) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] w-full h-full overflow-y-auto bg-[#fff7ec] text-slate-800"
-      style={{ fontFamily: "'Nunito', system-ui, sans-serif" }}
+      data-dismissing={dismissing ? 'true' : 'false'}
+      className={`
+        fixed inset-0 z-[100] w-full h-full overflow-y-auto bg-[#fff7ec] text-slate-800
+        transition-transform duration-[900ms]
+        ${dismissing ? '-translate-y-full' : 'translate-y-0'}
+      `}
+      style={{ fontFamily: "'Nunito', system-ui, sans-serif", transitionTimingFunction: 'cubic-bezier(0.65, 0, 0.35, 1)' }}
     >
       {/* Soft pastel blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -54,8 +67,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
 
       <div className={`
           relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-8 md:py-10
-          transition-all duration-700 ease-out
-          ${contentIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+          transition-all ease-out
+          ${dismissing
+            ? 'opacity-0 scale-[0.97] duration-300'
+            : contentIn
+              ? 'opacity-100 translate-y-0 duration-700'
+              : 'opacity-0 translate-y-4 duration-700'}
         `}>
         {/* Top bar */}
         <header className="flex items-center justify-between gap-4">
@@ -114,8 +131,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
 
             <div className="mt-9 flex items-center gap-4 flex-wrap">
               <button
-                onClick={onDismiss}
-                className="group relative inline-flex items-center gap-3 pl-7 pr-3 py-3 rounded-2xl bg-slate-900 text-white font-extrabold text-base tracking-tight border-b-[6px] border-slate-950 shadow-[0_8px_0_0_rgba(15,23,42,0.18)] hover:bg-slate-800 active:translate-y-[3px] active:border-b-[3px] active:shadow-[0_4px_0_0_rgba(15,23,42,0.18)] transition-all"
+                onClick={handleStart}
+                disabled={dismissing}
+                className="group relative inline-flex items-center gap-3 pl-7 pr-3 py-3 rounded-2xl bg-slate-900 text-white font-extrabold text-base tracking-tight border-b-[6px] border-slate-950 shadow-[0_8px_0_0_rgba(15,23,42,0.18)] hover:bg-slate-800 active:translate-y-[3px] active:border-b-[3px] active:shadow-[0_4px_0_0_rgba(15,23,42,0.18)] transition-all disabled:opacity-80"
               >
                 <span>{t.welcome.cta}</span>
                 <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-amber-400 text-slate-900 transition-transform group-hover:translate-x-1">
@@ -261,9 +279,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
           0%, 100% { transform: translateX(-100%); }
           60%, 100% { transform: translateX(120%); }
         }
+        @keyframes cube-scatter {
+          to {
+            transform: translate(var(--scatter-x, 0px), var(--scatter-y, 0px)) rotate(var(--scatter-r, 480deg)) scale(0.4);
+            opacity: 0;
+          }
+        }
         .voxel-3d-stage { perspective: 1000px; }
         .voxel-3d-spin { transform-style: preserve-3d; animation: voxel-spin 18s linear infinite; }
         .voxel-3d-face { position: absolute; width: 100%; height: 100%; }
+        [data-dismissing="true"] .voxel-block {
+          animation: cube-scatter 700ms cubic-bezier(0.4, 0, 0.7, 0.2) forwards !important;
+        }
       `}</style>
     </div>
   );
@@ -403,12 +430,12 @@ const Cube: React.FC<{ size: number; colors: { top: string; front: string; right
 
 const VoxelDiorama: React.FC = () => {
   const blocks = [
-    { x: -90, y: 60, z: 0,  size: 70, dur: 5,  delay: 0,    colors: { top: '#fda4af', front: '#f43f5e', right: '#be123c' } },
-    { x: 0,   y: -10, z: 40, size: 90, dur: 6,  delay: 0.4,  colors: { top: '#fde68a', front: '#f59e0b', right: '#b45309' } },
-    { x: 95,  y: 50, z: 20, size: 64, dur: 5.2, delay: 0.8,  colors: { top: '#bae6fd', front: '#0ea5e9', right: '#0369a1' } },
-    { x: -60, y: -90, z: -20, size: 56, dur: 4.6, delay: 0.2, colors: { top: '#bbf7d0', front: '#10b981', right: '#047857' } },
-    { x: 70,  y: -90, z: 0,  size: 50, dur: 5.6, delay: 0.6, colors: { top: '#ddd6fe', front: '#8b5cf6', right: '#5b21b6' } },
-    { x: -20, y: 130, z: -10, size: 44, dur: 4.2, delay: 0.9, colors: { top: '#fbcfe8', front: '#ec4899', right: '#9d174d' } },
+    { x: -90, y: 60, z: 0,  size: 70, dur: 5,  delay: 0,    sx: -340, sy:  220, sr:  720, colors: { top: '#fda4af', front: '#f43f5e', right: '#be123c' } },
+    { x: 0,   y: -10, z: 40, size: 90, dur: 6,  delay: 0.4,  sx:    0, sy: -420, sr:  540, colors: { top: '#fde68a', front: '#f59e0b', right: '#b45309' } },
+    { x: 95,  y: 50, z: 20, size: 64, dur: 5.2, delay: 0.8,  sx:  360, sy:  240, sr: -720, colors: { top: '#bae6fd', front: '#0ea5e9', right: '#0369a1' } },
+    { x: -60, y: -90, z: -20, size: 56, dur: 4.6, delay: 0.2, sx: -300, sy: -340, sr:  640, colors: { top: '#bbf7d0', front: '#10b981', right: '#047857' } },
+    { x: 70,  y: -90, z: 0,  size: 50, dur: 5.6, delay: 0.6,  sx:  320, sy: -380, sr: -480, colors: { top: '#ddd6fe', front: '#8b5cf6', right: '#5b21b6' } },
+    { x: -20, y: 130, z: -10, size: 44, dur: 4.2, delay: 0.9, sx:  -80, sy:  420, sr:  900, colors: { top: '#fbcfe8', front: '#ec4899', right: '#9d174d' } },
   ];
   return (
     <div className="relative w-full h-full voxel-3d-stage">
@@ -418,10 +445,14 @@ const VoxelDiorama: React.FC = () => {
         {blocks.map((b, i) => (
           <div
             key={i}
-            className="absolute"
+            className="voxel-block absolute"
             style={{
               transform: `translate(${b.x}px, ${b.y}px)`,
               animation: `voxel-float ${b.dur}s ease-in-out ${b.delay}s infinite`,
+              ['--scatter-x' as any]: `${b.sx}px`,
+              ['--scatter-y' as any]: `${b.sy}px`,
+              ['--scatter-r' as any]: `${b.sr}deg`,
+              animationDelay: `${i * 30}ms`,
             }}
           >
             <div
@@ -437,8 +468,13 @@ const VoxelDiorama: React.FC = () => {
         ))}
         {/* center hero block */}
         <div
-          className="relative voxel-3d-spin"
-          style={{ animationDuration: '14s' }}
+          className="voxel-block relative voxel-3d-spin"
+          style={{
+            animationDuration: '14s',
+            ['--scatter-x' as any]: '0px',
+            ['--scatter-y' as any]: '-200px',
+            ['--scatter-r' as any]: '360deg',
+          }}
         >
           <Cube size={120} colors={{ top: '#fef3c7', front: '#f97316', right: '#c2410c' }} />
         </div>

@@ -509,7 +509,13 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="relative w-full h-screen bg-[#f0f2f5] overflow-hidden">
+    <div className="relative w-full h-screen bg-[#fff7ec] overflow-hidden">
+      {/* Soft pastel atmosphere matching the landing */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute top-[-15%] left-[-10%] w-[45%] h-[45%] rounded-full bg-gradient-to-br from-rose-200/30 to-amber-200/20 blur-3xl" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full bg-gradient-to-tr from-sky-200/25 to-purple-200/20 blur-3xl" />
+      </div>
+
       {/* 3D Container */}
       <div ref={containerRef} className="absolute inset-0 z-0" />
       
@@ -617,9 +623,28 @@ const App: React.FC = () => {
       />
 
       {/* Undo/Redo Toast feedback */}
-      <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-800 text-white font-bold rounded-full shadow-2xl transition-all duration-300 pointer-events-none ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-        {toastMessage}
+      <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+        <div className="flex items-center gap-3 px-5 py-3 bg-slate-900 text-white font-extrabold rounded-2xl border-b-[4px] border-slate-950 shadow-[0_6px_0_0_rgba(15,23,42,0.18)]">
+          <span className="w-2 h-2 rounded-sm bg-amber-400" />
+          <span className="text-sm tracking-tight">{toastMessage}</span>
+        </div>
       </div>
+
+      {/* Credit chip — carries landing-page identity into the game */}
+      {!showWelcome && (
+        <a
+          href="https://github.com/kutluhangil"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Designed by kutluhangil"
+          className="fixed bottom-4 right-4 z-[60] inline-flex items-center gap-2 pl-2 pr-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-full border-2 border-slate-900/10 shadow-[0_3px_0_0_rgba(15,23,42,0.08)] hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_rgba(15,23,42,0.1)] transition-all group"
+        >
+          <span className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-400 to-rose-500 shadow-inner" />
+          <span className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-slate-500 group-hover:text-slate-900 transition-colors">
+            by <span className="italic text-slate-900 normal-case tracking-normal" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 500 }}>kutluhangil</span>
+          </span>
+        </a>
+      )}
     </div>
   );
 };

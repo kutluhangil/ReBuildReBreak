@@ -5,171 +5,250 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { Play, Sparkles, Box, Wand2, Orbit, Bird, Cat, Rabbit, Hammer, Trees, Bot, Home } from 'lucide-react';
+import { ArrowUpRight, Github, Linkedin } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
+import type { Language } from '../i18n/translations';
 
 interface WelcomeScreenProps {
   visible: boolean;
   onDismiss: () => void;
 }
 
-const cardContent = [
-    { icon: <Bird size={24} className="text-emerald-500" />, title: "Eagle", color: "bg-emerald-100" },
-    { icon: <Cat size={24} className="text-amber-500" />, title: "Cat", color: "bg-amber-100" },
-    { icon: <Trees size={24} className="text-emerald-500" />, title: "Terrain", color: "bg-emerald-100" },
-    { icon: <Rabbit size={24} className="text-rose-500" />, title: "Rabbit", color: "bg-rose-100" },
-    { icon: <Wand2 size={24} className="text-purple-500" />, title: "AI Gen", color: "bg-purple-100" },
-    { icon: <Bot size={24} className="text-sky-500" />, title: "Robot", color: "bg-sky-100" },
-    { icon: <Hammer size={24} className="text-slate-500" />, title: "Tools", color: "bg-slate-100" },
-    { icon: <Home size={24} className="text-orange-500" />, title: "House", color: "bg-orange-100" }
-];
-
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss }) => {
   const [mounted, setMounted] = useState(false);
+  const { lang, setLang, t } = useLanguage();
 
   useEffect(() => {
     if (visible) {
-      setTimeout(() => setMounted(true), 100);
-    } else {
-      setMounted(false);
+      const id = window.setTimeout(() => setMounted(true), 60);
+      return () => window.clearTimeout(id);
     }
+    setMounted(false);
   }, [visible]);
 
   if (!visible) return null;
 
+  const features = [
+    { num: t.welcome.feature1Number, title: t.welcome.feature1Title, desc: t.welcome.feature1Desc },
+    { num: t.welcome.feature2Number, title: t.welcome.feature2Title, desc: t.welcome.feature2Desc },
+    { num: t.welcome.feature3Number, title: t.welcome.feature3Title, desc: t.welcome.feature3Desc },
+  ];
+
   return (
-    <div className={`
-        fixed inset-0 w-full h-full z-[100] flex items-center justify-center font-sans tracking-tight
-        transition-all duration-700 ease-in-out backdrop-blur-2xl bg-white/60
+    <div
+      className={`
+        fixed inset-0 z-[100] w-full h-full overflow-hidden
+        text-[#f1ede4] bg-[#0b0b0c]
+        transition-opacity duration-700 ease-out
         ${mounted ? 'opacity-100' : 'opacity-0'}
-    `}>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Abstract background blobs for a premium look */}
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-gradient-to-tr from-rose-300/30 to-purple-400/30 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-tr from-sky-300/30 to-indigo-400/30 blur-3xl animate-pulse" style={{ animationDuration: '10s' }} />
-      </div>
+      `}
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+    >
+      {/* Subtle film grain + vignette */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.06] mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,0.04), transparent 60%), radial-gradient(80% 60% at 50% 100%, rgba(218,168,99,0.08), transparent 70%)' }}
+      />
+      {/* Hairline grid */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage:
+            'linear-gradient(to right, #f1ede4 1px, transparent 1px), linear-gradient(to bottom, #f1ede4 1px, transparent 1px)',
+          backgroundSize: '80px 80px',
+        }}
+      />
+
+      {/* Ornamental crosshair markers in corners */}
+      <Crosshair className="top-6 left-6" />
+      <Crosshair className="top-6 right-6" />
+      <Crosshair className="bottom-6 left-6" />
+      <Crosshair className="bottom-6 right-6" />
 
       <div className={`
-          relative z-10 w-full max-w-5xl flex flex-col md:flex-row items-center gap-16 p-8 md:p-16
-          transition-all duration-1000 delay-300 transform
-          ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-12 opacity-0'}
-      `}>
-          
-          {/* Left Side: Content */}
-          <div className="flex-1 flex flex-col items-start gap-8">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/5 border border-slate-900/10 mb-6">
-                <Sparkles size={14} className="text-indigo-500" />
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Powered by Gemini AI</span>
-              </div>
-              <h1 className="text-6xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tighter mb-6">
-                ReBuild<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">ReBreak</span>
-              </h1>
-              <p className="text-xl md:text-2xl font-medium text-slate-600 leading-relaxed max-w-lg">
-                The ultimate 3D voxel toy box. Sculpt, simulate physics, and use generative AI to morph your creations.
-              </p>
-            </div>
+          relative z-10 h-full w-full flex flex-col
+          transition-all duration-1000 ease-out
+          ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}
+        `}>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-              <div className="flex gap-4">
-                <div className="shrink-0 w-12 h-12 rounded-2xl bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center border border-slate-100">
-                  <Box className="text-rose-500" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-lg">Hyper-Sculpting</h3>
-                  <p className="text-slate-500 text-sm font-medium mt-1">Carve, extrude, and paint voxels in real-time with responsive brush tools.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="shrink-0 w-12 h-12 rounded-2xl bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center border border-slate-100">
-                  <Wand2 className="text-purple-500" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-lg">AI Generation</h3>
-                  <p className="text-slate-500 text-sm font-medium mt-1">Describe a structure and watch Gemini assemble it instantly from scratch.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="shrink-0 w-12 h-12 rounded-2xl bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center border border-slate-100">
-                  <Orbit className="text-sky-500" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-lg">Live Physics</h3>
-                  <p className="text-slate-500 text-sm font-medium mt-1">Tweak gravity and friction. Break your models into hundreds of simulated blocks.</p>
-                </div>
-              </div>
-            </div>
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-8 md:px-14 pt-8 md:pt-10">
+          <div className="flex items-center gap-3">
+            <Mark />
+            <span className="hidden sm:inline text-[11px] tracking-[0.3em] uppercase text-[#f1ede4]/60 font-medium">
+              ReBuild · ReBreak
+            </span>
+          </div>
 
-            <button 
-              onClick={onDismiss}
-              className="relative mt-4 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-indigo-600 transition-all duration-300 hover:shadow-[0_0_40px_-10px_rgba(79,70,229,0.5)] hover:-translate-y-1 active:translate-y-0 flex items-center gap-3 group overflow-hidden border border-slate-800 hover:border-indigo-400"
+          <LangToggle lang={lang} onChange={setLang} />
+        </header>
+
+        {/* Main editorial layout */}
+        <main className="flex-1 grid grid-cols-12 px-8 md:px-14 pt-12 md:pt-20 pb-10 gap-x-8 gap-y-12">
+          {/* Eyebrow + index column */}
+          <aside className="col-span-12 md:col-span-2 flex md:flex-col md:items-start items-center justify-between md:justify-start gap-4 md:gap-10 md:border-r md:border-[#f1ede4]/10 md:pr-6">
+            <div className="flex items-center gap-2 text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/55">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#daa863]" />
+              {t.welcome.eyebrow}
+            </div>
+            <div className="hidden md:block text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/40 font-mono">
+              {monoIndex(lang)}
+            </div>
+          </aside>
+
+          {/* Title + tagline column */}
+          <section className="col-span-12 md:col-span-7 flex flex-col">
+            <h1
+              className="leading-[0.88] tracking-[-0.02em] text-[#f1ede4]"
+              style={{ fontFamily: "'Instrument Serif', 'Times New Roman', serif", fontWeight: 400 }}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-              <span className="relative z-10">Start Creating</span>
-              <Play fill="currentColor" size={18} className="relative z-10 group-hover:translate-x-1 transition-transform" />
-            </button>
+              <span className="block text-[18vw] md:text-[10.5rem] lg:text-[12.5rem]">
+                {t.welcome.title1}
+              </span>
+              <span
+                className="block text-[18vw] md:text-[10.5rem] lg:text-[12.5rem] italic"
+                style={{
+                  background: 'linear-gradient(90deg, #f1ede4 0%, #daa863 50%, #f1ede4 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                {t.welcome.title2}
+              </span>
+            </h1>
+
+            <p className="mt-10 max-w-xl text-[15px] md:text-[17px] leading-relaxed text-[#f1ede4]/70 font-light">
+              {t.welcome.tagline}
+            </p>
+
+            <div className="mt-12 flex items-center gap-6 flex-wrap">
+              <button
+                onClick={onDismiss}
+                className="group relative inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-[#f1ede4] text-[#0b0b0c] text-sm font-medium tracking-wide transition-all duration-300 hover:bg-[#daa863] hover:pr-3"
+              >
+                <span>{t.welcome.enter}</span>
+                <span className="flex items-center justify-center w-9 h-9 rounded-full bg-[#0b0b0c] text-[#f1ede4] transition-transform duration-300 group-hover:rotate-45">
+                  <ArrowUpRight size={16} strokeWidth={2} />
+                </span>
+              </button>
+
+              <span className="text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/35 font-mono">
+                {t.welcome.scrollHint} · ↵
+              </span>
+            </div>
+          </section>
+
+          {/* Features column */}
+          <section className="col-span-12 md:col-span-3 flex flex-col gap-6 md:border-l md:border-[#f1ede4]/10 md:pl-6">
+            {features.map((f) => (
+              <article key={f.num} className="group flex flex-col gap-2">
+                <div className="flex items-baseline gap-3">
+                  <span className="font-mono text-[11px] text-[#daa863]/80 tracking-widest">{f.num}</span>
+                  <span className="h-px flex-1 bg-[#f1ede4]/15" />
+                </div>
+                <h3
+                  className="text-2xl md:text-[1.6rem] tracking-tight text-[#f1ede4]"
+                  style={{ fontFamily: "'Instrument Serif', 'Times New Roman', serif", fontWeight: 400 }}
+                >
+                  {f.title}
+                </h3>
+                <p className="text-[13px] leading-relaxed text-[#f1ede4]/55 font-light">{f.desc}</p>
+              </article>
+            ))}
+          </section>
+        </main>
+
+        {/* Footer credit */}
+        <footer className="px-8 md:px-14 pb-8 md:pb-10 flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/35 font-mono">
+              MMXXVI · Studio Edition
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] tracking-[0.18em] uppercase text-[#f1ede4]/50">
+                {t.welcome.designedBy}
+              </span>
+              <span
+                className="text-lg italic text-[#f1ede4]"
+                style={{ fontFamily: "'Instrument Serif', 'Times New Roman', serif" }}
+              >
+                kutluhangil
+              </span>
+              <span className="h-3 w-px bg-[#f1ede4]/20" />
+              <SocialLink href="https://github.com/kutluhangil" label="GitHub">
+                <Github size={14} strokeWidth={1.75} />
+              </SocialLink>
+              <SocialLink href="https://www.linkedin.com/in/kutluhangil/" label="LinkedIn">
+                <Linkedin size={14} strokeWidth={1.75} />
+              </SocialLink>
+            </div>
           </div>
 
-          {/* Right Side: Demo Visual */}
-          <div className="flex-1 w-full max-w-md aspect-square relative perspective-[1200px] flex items-center justify-center">
-             <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200/50 rounded-[3rem] shadow-2xl border-4 border-white/60 overflow-hidden flex items-center justify-center">
-                
-                {/* Central glowing core */}
-                <div className="absolute w-28 h-28 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-3xl shadow-[0_0_80px_rgba(79,70,229,0.5)] animate-pulse border border-white/20 flex items-center justify-center transform-style-3d" style={{ animationDuration: '4s' }}>
-                   <div className="w-16 h-16 bg-white/20 rounded-xl backdrop-blur-sm border border-white/30 animate-[spin-slow_8s_linear_infinite]" />
-                </div>
-
-                {/* Orbiting Cards */}
-                <div className="relative w-full h-full transform-style-3d animate-[spin-slow_24s_linear_infinite]">
-                    {cardContent.map((card, i) => {
-                        return (
-                           <div 
-                             key={i} 
-                             className="absolute top-1/2 left-1/2 transform-style-3d"
-                             style={{
-                               transform: `rotateY(${i * 45}deg) translateZ(160px) rotateX(15deg)`,
-                             }}
-                           >
-                             <div 
-                               className="w-24 h-32 bg-white/80 rounded-2xl backdrop-blur-xl border-2 border-white/80 shadow-2xl flex flex-col items-center p-3 gap-2 -ml-12 -mt-16"
-                               style={{
-                                 animation: `float-card ${3 + i%2}s ease-in-out infinite alternate`,
-                                 animationDelay: `${i * 0.4}s`,
-                               }}
-                             >
-                                <div className={`w-full flex-1 rounded-xl ${card.color} shadow-inner flex flex-col items-center justify-center border border-white/50`}>
-                                    {card.icon}
-                                </div>
-                                <div className="w-full flex flex-col gap-1.5 mt-1 items-center">
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{card.title}</span>
-                                    <div className="flex gap-1">
-                                      <div className="h-1 w-6 bg-slate-200 rounded-full" />
-                                      <div className="h-1 w-3 bg-slate-200 rounded-full" />
-                                    </div>
-                                </div>
-                             </div>
-                           </div>
-                        )
-                    })}
-                </div>
-             </div>
+          <div className="text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/30 font-mono text-right">
+            <div>v.01</div>
+            <div className="mt-1">Voxel · Physics · Gemini</div>
           </div>
-
+        </footer>
       </div>
-      <style>{`
-        .perspective-\\[1200px\\] { perspective: 1200px; }
-        .transform-style-3d { transform-style: preserve-3d; }
-        @keyframes spin-slow {
-          from { transform: rotateX(-15deg) rotateY(0deg); }
-          to { transform: rotateX(-15deg) rotateY(360deg); }
-        }
-        @keyframes float-card {
-          from { transform: translateY(-10px) rotateZ(-3deg); }
-          to { transform: translateY(10px) rotateZ(3deg); }
-        }
-        @keyframes shimmer {
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
     </div>
   );
 };
+
+const Crosshair: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`pointer-events-none absolute w-3 h-3 ${className}`}>
+    <span className="absolute top-1/2 left-0 right-0 h-px bg-[#f1ede4]/30" />
+    <span className="absolute left-1/2 top-0 bottom-0 w-px bg-[#f1ede4]/30" />
+  </div>
+);
+
+const Mark: React.FC = () => (
+  <div className="relative w-7 h-7">
+    <div className="absolute inset-0 border border-[#f1ede4]/40 rounded-[4px]" />
+    <div className="absolute inset-[5px] bg-[#daa863]/90 rounded-[2px]" />
+    <div className="absolute -bottom-px -right-px w-1.5 h-1.5 bg-[#f1ede4]" />
+  </div>
+);
+
+const SocialLink: React.FC<{ href: string; label: string; children: React.ReactNode }> = ({ href, label, children }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={label}
+    className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#f1ede4]/20 text-[#f1ede4]/60 hover:text-[#0b0b0c] hover:bg-[#daa863] hover:border-[#daa863] transition-colors"
+  >
+    {children}
+  </a>
+);
+
+const LangToggle: React.FC<{ lang: Language; onChange: (l: Language) => void }> = ({ lang, onChange }) => {
+  return (
+    <div className="relative inline-flex items-center p-1 rounded-full border border-[#f1ede4]/15 bg-[#f1ede4]/[0.03] backdrop-blur-sm">
+      <span
+        className={`
+          absolute top-1 bottom-1 w-[42px] rounded-full bg-[#f1ede4] transition-transform duration-300 ease-out
+          ${lang === 'en' ? 'translate-x-0' : 'translate-x-[42px]'}
+        `}
+      />
+      {(['en', 'tr'] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => onChange(l)}
+          className={`
+            relative z-10 w-[42px] py-1.5 text-[11px] font-mono tracking-[0.18em] uppercase transition-colors
+            ${lang === l ? 'text-[#0b0b0c]' : 'text-[#f1ede4]/60 hover:text-[#f1ede4]'}
+          `}
+          aria-pressed={lang === l}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const monoIndex = (lang: Language) => (lang === 'tr' ? 'INDEX / 01—03' : 'INDEX / 01—03');

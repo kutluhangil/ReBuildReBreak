@@ -10,6 +10,7 @@ import { JsonModal } from "./components/JsonModal";
 import { PromptModal } from "./components/PromptModal";
 import { BuildEditModal } from "./components/BuildEditModal";
 import { SaveBuildModal } from "./components/SaveBuildModal";
+import { HelpModal } from "./components/HelpModal";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { Generators } from "./utils/voxelGenerators";
 import {
@@ -38,6 +39,111 @@ const App: React.FC = () => {
 
   const [showWelcome, setShowWelcome] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Tool and Canvas State
+  const [currentTool, setCurrentTool] = useState<BrushTool>(BrushTool.ADD);
+  const [currentColor, setCurrentColor] = useState<string>("#FF0000");
+  const [currentMaterial, setCurrentMaterial] = useState<MaterialType>(
+    MaterialType.SOLID,
+  );
+  const [currentBaseModel, setCurrentBaseModel] = useState<string>("Eagle");
+
+  // History and Undo/Redo
+  const [history, setHistory] = useState<HistoryState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+
+  // Build Management
+  const [customBuilds, setCustomBuilds] = useState<SavedModel[]>(() => {
+    const saved = localStorage.getItem("voxel_architect_builds");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customRebuilds, setCustomRebuilds] = useState<SavedModel[]>(() => {
+    const saved = localStorage.getItem("voxel_architect_rebuilds");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // UI State
+  const [editingBuild, setEditingBuild] = useState<SavedModel | null>(null);
+  const [isSavingScene, setIsSavingScene] = useState(false);
+  const [hoveredVoxel, setHoveredVoxel] = useState<{
+    x: number;
+    y: number;
+    z: number;
+    material: string;
+  } | null>(null);
+  const [jsonData, setJsonData] = useState<string>("");
+
+  // Prompt State
+  const [folder, setFolder] = useState<string>("");
+  const [imageBase64, setImageBase64] = useState<string>("");
+  const [prompt, setPrompt] = useState<string>("");
+
+  // Camera and Display
+  const [isAutoRotate, setIsAutoRotate] = useState(true);
+  const [gridSnapping, setGridSnapping] = useState(true);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showRecentModelsDropdown, setShowRecentModelsDropdown] =
+    useState(false);
+
+  // Brush and Tool Settings
+  const [brushSize, setBrushSize] = useState(1);
+  const [symmetry, setSymmetry] = useState({ x: false, y: false, z: false });
+
+  // Physics and Materials
+  const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
+    gravity: 0.1,
+    bounce: 0.6,
+    friction: 0.3,
+    explosionForce: 50,
+  });
+
+  const [sculptSettings, setSculptSettings] = useState<SculptSettings>({
+    size: 1.5,
+    strength: 0.2,
+  });
+
+  const [materialConfig, setMaterialConfig] = useState<MaterialConfigMap>({
+    [MaterialType.GLASS]: {
+      roughness: 0.1,
+      metalness: 0.1,
+      transmission: 0.9,
+      thickness: 0.5,
+      transparent: true,
+      opacity: 1.0,
+    },
+    [MaterialType.WOOD]: {
+      roughness: 0.8,
+      metalness: 0.0,
+      map: null,
+    },
+    [MaterialType.METAL]: {
+      roughness: 0.2,
+      metalness: 1.0,
+    },
+    [MaterialType.STONE]: {
+      roughness: 0.9,
+      metalness: 0.0,
+    },
+    [MaterialType.SOLID]: {
+      roughness: 0.5,
+      metalness: 0.0,
+    },
+    [MaterialType.PLASTIC]: {
+      roughness: 0.5,
+      metalness: 0.0,
+    },
+    [MaterialType.FABRIC]: {
+      roughness: 0.9,
+      metalness: 0.0,
+    },
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      "voxel_architect_builds",
+      JSON.stringify(customBuilds),
+    );
+  }, [customBuilds]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -131,6 +237,14 @@ const App: React.FC = () => {
     }
   }, [sculptSettings]);
 
+  // Sync Brush Settings
+  useEffect(() => {
+    if (engineRef.current) {
+      engineRef.current.brushSize = brushSize;
+      engineRef.current.symmetry = symmetry;
+    }
+  }, [brushSize, symmetry]);
+
   // Sync Materials
   useEffect(() => {
     if (engineRef.current) {
@@ -190,6 +304,78 @@ const App: React.FC = () => {
       showToast(`Redo: ${history[newIndex].actionName || "Action reapplied"}`);
     }
   };
+
+  // --- Keyboard Shortcuts ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore shortcuts if focusing on inputs or modals
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        isPromptModalOpen ||
+        isJsonModalOpen ||
+        editingBuild !== null ||
+        isSavingScene
+      ) {
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "z") {
+          e.preventDefault();
+          if (e.shiftKey) {
+            handleRedo();
+          } else {
+            handleUndo();
+          }
+        } else if (e.key === "y") {
+          e.preventDefault();
+          handleRedo();
+        } else if (e.key === "s") {
+          e.preventDefault();
+          setIsSavingScene(true);
+        } else if (e.key === "e") {
+          e.preventDefault();
+          if (engineRef.current) engineRef.current.exportGLTF();
+        }
+      } else {
+        switch (e.key) {
+          case "1":
+            setCurrentTool(BrushTool.ADD);
+            break;
+          case "2":
+            setCurrentTool(BrushTool.REMOVE);
+            break;
+          case "3":
+            setCurrentTool(BrushTool.PAINT);
+            break;
+          case "4":
+            setCurrentTool(BrushTool.SCULPT);
+            break;
+          case "F1":
+            e.preventDefault();
+            setShowHelpModal(true);
+            break;
+          case "Escape":
+            if (showWelcome) setShowWelcome(false);
+            if (showHelpModal) setShowHelpModal(false);
+            break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    isPromptModalOpen,
+    isJsonModalOpen,
+    editingBuild,
+    isSavingScene,
+    showWelcome,
+    showHelpModal,
+    handleUndo,
+    handleRedo, // these will likely trigger effect updates smoothly
+  ]);
 
   const handleClear = () => {
     if (
@@ -516,6 +702,16 @@ const App: React.FC = () => {
             engineRef.current.exportGLTF();
           }
         }}
+        onExportVOX={() => {
+          if (engineRef.current) {
+            engineRef.current.exportVOX();
+          }
+        }}
+        onExportSTL={() => {
+          if (engineRef.current) {
+            engineRef.current.exportSTL();
+          }
+        }}
         onResetCamera={() => engineRef.current?.resetCamera()}
         onZoomToFit={() => engineRef.current?.zoomToFit()}
         onToggleCameraProjection={() =>
@@ -523,9 +719,27 @@ const App: React.FC = () => {
         }
         onToggleRotation={handleToggleRotation}
         onToggleInfo={() => setShowWelcome(!showWelcome)}
+        brushSize={brushSize}
+        symmetry={symmetry}
+        onBrushSizeChange={setBrushSize}
+        onSymmetryChange={setSymmetry}
+        onShowHelp={() => setShowHelpModal(true)}
       />
 
       {/* Modals & Screens */}
+
+      {/* Toast for AI / Messages */}
+      <div
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-indigo-600 text-white font-bold rounded-full shadow-2xl transition-all duration-300 pointer-events-none flex items-center gap-3 ${isGenerating ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-8"}`}
+      >
+        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        AI is generating your model...
+      </div>
+
+      <HelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+      />
 
       <SaveBuildModal
         isOpen={isSavingScene}

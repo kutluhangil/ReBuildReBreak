@@ -4,6 +4,7 @@
  */
 
 import * as THREE from "three";
+import Stats from "three/examples/jsm/libs/stats.module.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter";
 import {
@@ -61,6 +62,8 @@ export class VoxelEngine {
   public currentTool: BrushTool = BrushTool.ADD;
   public currentColor: number = 0xff0000;
   public currentMaterial: MaterialType = MaterialType.SOLID;
+  public brushSize: number = 1;
+  public symmetry = { x: false, y: false, z: false };
   public sculptSettings: SculptSettings = { size: 1.5, strength: 0.2 };
 
   public materialConfig: MaterialConfigMap = {
@@ -98,12 +101,15 @@ export class VoxelEngine {
 
   private highlightBox: THREE.Mesh;
   private previewVoxel: THREE.Mesh;
+  private previewSphere: THREE.Mesh;
 
   private onInteraction: (action?: string) => void;
 
   public onHoverChange?: (
     info: { x: number; y: number; z: number; material: string } | null,
   ) => void;
+
+  private stats: Stats;
 
   public physicsConfig: PhysicsConfig = {
     gravity: -14.0,
@@ -143,6 +149,14 @@ export class VoxelEngine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = false;
     container.appendChild(this.renderer.domElement);
+
+    // Initialize FPS Stats
+    this.stats = new Stats();
+    this.stats.dom.style.position = "absolute";
+    this.stats.dom.style.top = "10px";
+    this.stats.dom.style.left = "10px";
+    this.stats.dom.style.zIndex = "100";
+    container.appendChild(this.stats.dom);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -211,6 +225,19 @@ export class VoxelEngine {
     );
     this.previewVoxel.visible = false;
     this.scene.add(this.previewVoxel);
+
+    // Add Preview Sphere
+    this.previewSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.3,
+        wireframe: true,
+      }),
+    );
+    this.previewSphere.visible = false;
+    this.scene.add(this.previewSphere);
 
     // Lights
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -331,6 +358,7 @@ export class VoxelEngine {
     if (this.state !== AppState.STABLE) {
       this.highlightBox.visible = false;
       this.previewVoxel.visible = false;
+      this.previewSphere.visible = false;
       return;
     }
 
@@ -338,6 +366,26 @@ export class VoxelEngine {
     (this.previewVoxel.material as THREE.MeshBasicMaterial).color.setHex(
       this.currentColor,
     );
+
+    // Adjust previewSphere scale and color
+    const isSphereActive =
+      this.brushSize > 1 || this.currentTool === BrushTool.SCULPT;
+    if (isSphereActive) {
+      const radius =
+        this.currentTool === BrushTool.SCULPT
+          ? this.sculptSettings.size
+          : this.brushSize;
+      this.previewSphere.scale.set(radius, radius, radius);
+      let sphereColor =
+        this.currentTool === BrushTool.REMOVE
+          ? 0xff0000
+          : this.currentTool === BrushTool.PAINT
+            ? 0xffff00
+            : this.currentColor;
+      (this.previewSphere.material as THREE.MeshBasicMaterial).color.setHex(
+        sphereColor,
+      );
+    }
 
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -383,27 +431,42 @@ export class VoxelEngine {
           newPos.copy(pos.clone().add(normal.multiplyScalar(0.5)));
         }
 
-        this.highlightBox.visible = true;
-        this.highlightBox.position.copy(pos);
-
-        this.previewVoxel.visible = true;
-        this.previewVoxel.position.copy(newPos);
+        if (isSphereActive) {
+          this.previewSphere.visible = true;
+          this.previewSphere.position.copy(pos);
+          this.highlightBox.visible = false;
+          this.previewVoxel.visible = false;
+        } else {
+          this.previewSphere.visible = false;
+          this.highlightBox.visible = true;
+          this.highlightBox.position.copy(pos);
+          this.previewVoxel.visible = true;
+          this.previewVoxel.position.copy(newPos);
+        }
       } else if (
         this.currentTool === BrushTool.REMOVE ||
         this.currentTool === BrushTool.PAINT ||
         this.currentTool === BrushTool.SCULPT
       ) {
-        this.highlightBox.visible = true;
-        this.highlightBox.position.copy(pos);
-        this.previewVoxel.visible = false;
-
-        // Match Outline color to tool (Red for remove, Yellow for paint/sculpt)
-        (this.highlightBox.material as THREE.LineBasicMaterial).color.setHex(
-          this.currentTool === BrushTool.REMOVE ? 0xff0000 : 0xffff00,
-        );
+        if (isSphereActive) {
+          this.previewSphere.visible = true;
+          this.previewSphere.position.copy(pos);
+          this.highlightBox.visible = false;
+          this.previewVoxel.visible = false;
+        } else {
+          this.previewSphere.visible = false;
+          this.highlightBox.visible = true;
+          this.highlightBox.position.copy(pos);
+          this.previewVoxel.visible = false;
+          // Match Outline color to tool (Red for remove, Yellow for paint)
+          (this.highlightBox.material as THREE.LineBasicMaterial).color.setHex(
+            this.currentTool === BrushTool.REMOVE ? 0xff0000 : 0xffff00,
+          );
+        }
       } else {
         this.highlightBox.visible = false;
         this.previewVoxel.visible = false;
+        this.previewSphere.visible = false;
       }
     } else {
       if (this.onHoverChange) {
@@ -411,7 +474,11 @@ export class VoxelEngine {
       }
       this.highlightBox.visible = false;
 
-      if (this.currentTool === BrushTool.ADD) {
+      // Handle floor intersection
+      if (
+        this.currentTool === BrushTool.ADD ||
+        this.currentTool === BrushTool.SCULPT
+      ) {
         const intersectsPlane = this.raycaster.intersectObject(
           this.scene.children.find(
             (c) =>
@@ -424,17 +491,26 @@ export class VoxelEngine {
           const x = this.gridSnapping ? Math.round(pt.x) : pt.x;
           const z = this.gridSnapping ? Math.round(pt.z) : pt.z;
           const y = this.gridSnapping ? Math.round(pt.y) + 0.5 : pt.y + 0.5;
-          this.previewVoxel.visible = true;
-          this.previewVoxel.position.set(x, y, z);
+
+          if (isSphereActive) {
+            this.previewSphere.visible = true;
+            this.previewSphere.position.set(x, y, z);
+            this.previewVoxel.visible = false;
+          } else {
+            this.previewSphere.visible = false;
+            this.previewVoxel.visible = true;
+            this.previewVoxel.position.set(x, y, z);
+          }
         } else {
           this.previewVoxel.visible = false;
+          this.previewSphere.visible = false;
         }
       } else {
         this.previewVoxel.visible = false;
+        this.previewSphere.visible = false;
       }
     }
   }
-
   private fireProjectile(event: PointerEvent) {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1103,6 +1179,7 @@ export class VoxelEngine {
 
   private animate() {
     this.animationId = requestAnimationFrame(this.animate);
+    this.stats.update();
     this.controls.update();
 
     // audio listener updates removed (silent)
@@ -1241,8 +1318,236 @@ export class VoxelEngine {
     );
   }
 
+  public exportVOX() {
+    // MagicaVoxel VOX file format (simple .vox)
+    // Minimal VOX format: header + main chunk with voxels
+    const voxels = this.voxels;
+
+    // Build VOX data
+    let voxelData = new Uint8Array(4 * voxels.length); // 4 bytes per voxel (x, y, z, colorIndex)
+    let colorData = new Map<number, number>();
+    let colorIndex = 1;
+
+    voxels.forEach((v, idx) => {
+      const hexColor = v.color.getHexString().toUpperCase();
+      if (!colorData.has(v.color.getHex())) {
+        colorData.set(v.color.getHex(), colorIndex);
+        colorIndex++;
+      }
+      const paletteIndex = colorData.get(v.color.getHex()) || 1;
+
+      // Clamp to VOX range (0-255)
+      voxelData[idx * 4] = Math.min(255, Math.max(0, Math.round(v.x + 128)));
+      voxelData[idx * 4 + 1] = Math.min(255, Math.max(0, Math.round(v.y)));
+      voxelData[idx * 4 + 2] = Math.min(
+        255,
+        Math.max(0, Math.round(v.z + 128)),
+      );
+      voxelData[idx * 4 + 3] = paletteIndex;
+    });
+
+    // Minimal VOX format (binary)
+    // VOX 150 header + SIZE chunk + XYZI chunk
+    const header = new TextEncoder().encode("VOX ");
+    const version = new Uint8Array(4);
+    version[0] = 150;
+
+    // Main chunk
+    const mainData = new Uint8Array(voxelData.length + 28); // SIZE (12) + XYZI (12) + data
+    let offset = 0;
+
+    // SIZE chunk: 3 uint32 for dimensions
+    const sizeName = new TextEncoder().encode("SIZE");
+    const sizePayload = new Uint8Array(12);
+    const sizeView = new DataView(sizePayload.buffer);
+    sizeView.setUint32(0, 256, true);
+    sizeView.setUint32(4, 256, true);
+    sizeView.setUint32(8, 256, true);
+
+    // XYZI chunk: count + voxels
+    const xyzaName = new TextEncoder().encode("XYZI");
+    const xyzaPayload = new Uint8Array(4 + voxelData.length);
+    const xyzaView = new DataView(xyzaPayload.buffer);
+    xyzaView.setUint32(0, voxels.length, true);
+    xyzaPayload.set(voxelData, 4);
+
+    // Create simple JSON-based .vox-like format for easier handling
+    const voxFormat = {
+      version: 150,
+      models: [
+        {
+          size: { x: 256, y: 256, z: 256 },
+          voxels: voxels.map((v) => ({
+            x: Math.min(255, Math.max(0, Math.round(v.x + 128))),
+            y: Math.min(255, Math.max(0, Math.round(v.y))),
+            z: Math.min(255, Math.max(0, Math.round(v.z + 128))),
+            color: v.color.getHex(),
+          })),
+        },
+      ],
+    };
+
+    const output = JSON.stringify(voxFormat, null, 2);
+    const blob = new Blob([output], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.style.display = "none";
+    link.href = url;
+    link.download = "voxel-model.vox";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  public exportSTL() {
+    // STL (Stereolithography) format for 3D printing
+    // Binary STL format
+    const voxels = this.voxels;
+    const verticesData: number[] = [];
+    const facesData: number[] = [];
+
+    // Generate mesh for each voxel (cube)
+    voxels.forEach((v) => {
+      const x = v.x;
+      const y = v.y;
+      const z = v.z;
+      const size = 0.5; // Half-size for voxel
+
+      // Define 8 vertices of a cube
+      const vertices = [
+        [x - size, y - size, z - size],
+        [x + size, y - size, z - size],
+        [x + size, y + size, z - size],
+        [x - size, y + size, z - size],
+        [x - size, y - size, z + size],
+        [x + size, y - size, z + size],
+        [x + size, y + size, z + size],
+        [x - size, y + size, z + size],
+      ];
+
+      // Add vertices
+      const vertexIndices = verticesData.length / 3;
+      vertices.forEach((vertex) => {
+        verticesData.push(...vertex);
+      });
+
+      // Define 12 triangles (2 per face, 6 faces)
+      const faces = [
+        [0, 1, 2],
+        [0, 2, 3], // front
+        [4, 6, 5],
+        [4, 7, 6], // back
+        [0, 4, 5],
+        [0, 5, 1], // bottom
+        [2, 6, 7],
+        [2, 7, 3], // top
+        [0, 3, 7],
+        [0, 7, 4], // left
+        [1, 5, 6],
+        [1, 6, 2], // right
+      ];
+
+      faces.forEach((face) => {
+        facesData.push(
+          vertexIndices + face[0],
+          vertexIndices + face[1],
+          vertexIndices + face[2],
+        );
+      });
+    });
+
+    // Generate STL binary data
+    const triangles = facesData.length / 3;
+    const arrayBuffer = new ArrayBuffer(80 + 4 + triangles * 50); // header + triangle count + triangles
+    const view = new DataView(arrayBuffer);
+
+    // Header (80 bytes)
+    const headerStr = "VoxelModelSTL" + " ".repeat(67);
+    new TextEncoder().encodeInto(headerStr, new Uint8Array(arrayBuffer, 0, 80));
+
+    // Triangle count
+    view.setUint32(80, triangles, true);
+
+    // Write triangles
+    let offset = 84;
+    for (let i = 0; i < triangles; i++) {
+      const v0Idx = facesData[i * 3] * 3;
+      const v1Idx = facesData[i * 3 + 1] * 3;
+      const v2Idx = facesData[i * 3 + 2] * 3;
+
+      const v0 = [
+        verticesData[v0Idx],
+        verticesData[v0Idx + 1],
+        verticesData[v0Idx + 2],
+      ];
+      const v1 = [
+        verticesData[v1Idx],
+        verticesData[v1Idx + 1],
+        verticesData[v1Idx + 2],
+      ];
+      const v2 = [
+        verticesData[v2Idx],
+        verticesData[v2Idx + 1],
+        verticesData[v2Idx + 2],
+      ];
+
+      // Calculate normal
+      const e1 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
+      const e2 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
+      const normal = [
+        e1[1] * e2[2] - e1[2] * e2[1],
+        e1[2] * e2[0] - e1[0] * e2[2],
+        e1[0] * e2[1] - e1[1] * e2[0],
+      ];
+
+      const length = Math.sqrt(
+        normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2],
+      );
+      const normalizedNormal = [
+        normal[0] / length,
+        normal[1] / length,
+        normal[2] / length,
+      ];
+
+      // Write normal
+      view.setFloat32(offset, normalizedNormal[0], true);
+      offset += 4;
+      view.setFloat32(offset, normalizedNormal[1], true);
+      offset += 4;
+      view.setFloat32(offset, normalizedNormal[2], true);
+      offset += 4;
+
+      // Write vertices
+      [v0, v1, v2].forEach((v) => {
+        view.setFloat32(offset, v[0], true);
+        offset += 4;
+        view.setFloat32(offset, v[1], true);
+        offset += 4;
+        view.setFloat32(offset, v[2], true);
+        offset += 4;
+      });
+
+      // Attribute byte count
+      view.setUint16(offset, 0, true);
+      offset += 2;
+    }
+
+    const blob = new Blob([arrayBuffer], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.style.display = "none";
+    link.href = url;
+    link.download = "voxel-model.stl";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   public cleanup() {
     cancelAnimationFrame(this.animationId);
+    if (this.stats && this.stats.dom && this.stats.dom.parentNode) {
+      this.stats.dom.parentNode.removeChild(this.stats.dom);
+    }
     this.renderer.domElement.removeEventListener(
       "pointerdown",
       this.onPointerDown.bind(this),

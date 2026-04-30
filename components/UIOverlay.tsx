@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppState, SavedModel, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap } from '../types';
-import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2, Trash2, Home, Bot, Trees, Download, Sun, Moon, Sunrise, Camera, Maximize, View } from 'lucide-react';
+import { AppState, SavedModel, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap, ShapeType } from '../types';
+import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2, Trash2, Home, Bot, Trees, Download, Sun, Moon, Sunrise, Camera, Maximize, View, Cone, Cylinder, BoxSelect, Spline } from 'lucide-react';
 import { MaterialPreview } from './MaterialPreview';
 import { CustomColorPicker } from './CustomColorPicker';
 
@@ -18,6 +18,7 @@ interface UIOverlayProps {
   currentTool: BrushTool;
   currentColor: string;
   currentMaterial: MaterialType;
+  currentShape?: ShapeType;
   canUndo: boolean;
   canRedo: boolean;
   gridSnapping: boolean;
@@ -38,6 +39,7 @@ interface UIOverlayProps {
   onImportJson: () => void;
   onSaveBuild: (name: string, folder?: string) => void;
   onExportGLTF: () => void;
+  onExportOBJ: () => void;
   onResetCamera: () => void;
   onZoomToFit: () => void;
   onToggleCameraProjection: () => void;
@@ -47,6 +49,7 @@ interface UIOverlayProps {
   onToolChange: (tool: BrushTool) => void;
   onColorChange: (color: string) => void;
   onMaterialChange: (material: MaterialType) => void;
+  onShapeChange?: (shape: ShapeType) => void;
   onGridSnapToggle: () => void;
   onPhysicsConfigChange: (config: PhysicsConfig) => void;
   onEnvironmentChange: (env: 'day' | 'night' | 'sunset') => void;
@@ -81,6 +84,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   currentTool,
   currentColor,
   currentMaterial,
+  currentShape,
   canUndo,
   canRedo,
   gridSnapping,
@@ -101,6 +105,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onImportJson,
   onSaveBuild,
   onExportGLTF,
+  onExportOBJ,
   onResetCamera,
   onZoomToFit,
   onToggleCameraProjection,
@@ -110,6 +115,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onToolChange,
   onColorChange,
   onMaterialChange,
+  onShapeChange,
   onUndo,
   onRedo,
   onGridSnapToggle,
@@ -177,6 +183,14 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
       return acc;
   }, {} as Record<string, SavedModel[]>);
 
+  const SHAPES = [
+    { id: ShapeType.CUBE, icon: Box, label: 'Cube' },
+    { id: ShapeType.CYLINDER, icon: Cylinder, label: 'Cylinder' },
+    { id: ShapeType.PYRAMID, icon: Cone, label: 'Pyramid' },
+    { id: ShapeType.HALF_BLOCK, icon: BoxSelect, label: 'Half Block' },
+    { id: ShapeType.STAIRS, icon: Spline, label: 'Stairs' }
+  ];
+
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none select-none z-10 overflow-hidden">
       
@@ -226,6 +240,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
                 <DropdownItem onClick={onImportJson} icon={<FileJson size={16}/>} label="Import JSON" />
                 <DropdownItem onClick={onExportGLTF} icon={<Download size={16}/>} label="Export GLTF" />
+                <DropdownItem onClick={onExportOBJ} icon={<Download size={16}/>} label="Export OBJ" />
             </DropdownMenu>
 
             <div className="flex items-center gap-3 px-4 py-2 bg-white/90 backdrop-blur-sm shadow-sm rounded-xl border border-slate-200 text-slate-500 font-bold w-fit mt-2">
@@ -349,7 +364,23 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 <ToolButton icon={<Eraser size={20} />} active={currentTool===BrushTool.REMOVE} onClick={() => onToolChange(BrushTool.REMOVE)} tooltip="Remove Voxel" />
                 <ToolButton icon={<Paintbrush size={20} />} active={currentTool===BrushTool.PAINT} onClick={() => onToolChange(BrushTool.PAINT)} tooltip="Paint Voxel" />
                 <ToolButton icon={<Fingerprint size={20} />} active={currentTool===BrushTool.SCULPT} onClick={() => onToolChange(BrushTool.SCULPT)} tooltip="Sculpt Voxel" />
+                <ToolButton icon={<Camera size={20} />} active={currentTool===BrushTool.DECAL} onClick={() => onToolChange(BrushTool.DECAL)} tooltip="Add Decal" />
             </div>
+
+            {/* Shape Tools */}
+            {currentTool === BrushTool.ADD && (
+                <div className="bg-white/90 backdrop-blur p-2 rounded-2xl shadow-xl flex flex-col gap-2 border-2 border-slate-200">
+                    {SHAPES.map(s => (
+                        <ToolButton 
+                            key={s.id}
+                            icon={<s.icon size={20} />} 
+                            active={currentShape === s.id} 
+                            onClick={() => onShapeChange?.(s.id)} 
+                            tooltip={s.label} 
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* Sculpt Settings */}
             {currentTool === BrushTool.SCULPT && (

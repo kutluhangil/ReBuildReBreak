@@ -188,11 +188,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
             </div>
           </div>
 
-          <div className="text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/30 font-mono text-right">
-            <div>v.01</div>
-            <div className="mt-1">Voxel · Physics · Gemini</div>
-          </div>
-        </footer>
       </div>
     </div>
   );

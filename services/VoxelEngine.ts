@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
-import { AppState, SimulationVoxel, RebuildTarget, VoxelData, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap } from '../types';
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
+import { AppState, SimulationVoxel, RebuildTarget, VoxelData, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap, ShapeType } from '../types';
 import { CONFIG, COLORS } from '../utils/voxelConstants';
 import { audioService } from './AudioService';
 
@@ -23,7 +24,7 @@ export class VoxelEngine {
   private isOrthographic: boolean = false;
   private renderer: THREE.WebGLRenderer;
   public controls: OrbitControls;
-  private meshGroups: Map<MaterialType, THREE.InstancedMesh> = new Map();
+  private meshGroups: Map<string, THREE.InstancedMesh> = new Map();
   private dummy = new THREE.Object3D();
   
   private ambientLight!: THREE.AmbientLight;
@@ -48,6 +49,7 @@ export class VoxelEngine {
   public currentTool: BrushTool = BrushTool.ADD;
   public currentColor: number = 0xff0000;
   public currentMaterial: MaterialType = MaterialType.SOLID;
+  public currentShape: ShapeType = ShapeType.CUBE;
   public sculptSettings: SculptSettings = { size: 1.5, strength: 0.2 };
   
   public materialConfig: MaterialConfigMap = {
@@ -260,7 +262,7 @@ export class VoxelEngine {
       mesh.getMatrixAt(instanceId, matrix);
       const pos = new THREE.Vector3().setFromMatrixPosition(matrix);
 
-      const materialTypeStr = Array.from(this.meshGroups.entries()).find(([k, v]) => v === mesh)?.[0];
+      const materialTypeStr = Array.from(this.meshGroups.entries()).find(([k, v]) => v === mesh)?.[0].split('_')[3] as MaterialType;
       if (this.onHoverChange) {
          this.onHoverChange(materialTypeStr ? { x: Math.round(pos.x), y: Math.round(pos.y), z: Math.round(pos.z), material: materialTypeStr } : null);
       }
@@ -386,6 +388,28 @@ export class VoxelEngine {
           this.voxels[voxelIndex].material = this.currentMaterial;
           this.createVoxels(this.getData());
           this.onInteraction('Painted Voxel');
+      } else if (this.currentTool === BrushTool.DECAL) {
+          if (this.voxels.length >= this.MAX_VOXELS) return;
+          if (intersect.face) {
+              const normal = intersect.face.normal.clone();
+              normal.transformDirection(mesh.matrixWorld).normalize();
+              const decalPos = pos.clone().add(normal.clone().multiplyScalar(CONFIG.VOXEL_SIZE * 0.501)); 
+              
+              this.voxels.push({
+                  id: this.voxels.length > 0 ? Math.max(...this.voxels.map(v => v.id)) + 1 : 0,
+                  x: decalPos.x, y: decalPos.y, z: decalPos.z,
+                  color: new THREE.Color(this.currentColor),
+                  material: this.currentMaterial,
+                  shape: ShapeType.CUBE,
+                  isDecal: true,
+                  nx: normal.x, ny: normal.y, nz: normal.z,
+                  vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0,
+                  rvx: 0, rvy: 0, rvz: 0
+              });
+              
+              this.createVoxels(this.getData());
+              this.onInteraction('Added Decal');
+          }
       } else if (this.currentTool === BrushTool.ADD) {
           // Add voxel
           if (this.voxels.length >= this.MAX_VOXELS) return;
@@ -404,6 +428,7 @@ export class VoxelEngine {
                   x: newPos.x, y: newPos.y, z: newPos.z,
                   color: new THREE.Color(this.currentColor),
                   material: this.currentMaterial,
+                  shape: this.currentShape,
                   vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0,
                   rvx: 0, rvy: 0, rvz: 0
               });
@@ -455,6 +480,7 @@ export class VoxelEngine {
                   x: x, y: y, z: z,
                   color: new THREE.Color(this.currentColor),
                   material: this.currentMaterial,
+                  shape: this.currentShape,
                   vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0,
                   rvx: 0, rvy: 0, rvz: 0
               });
@@ -494,6 +520,8 @@ export class VoxelEngine {
     });
     this.meshGroups.clear();
 
+    const CHUNK_SIZE = 16;
+    
     this.voxels = data.map((v, i) => {
         const c = new THREE.Color(v.color);
         // Slight color variation for realism
@@ -502,22 +530,32 @@ export class VoxelEngine {
             id: i,
             x: v.x, y: v.y, z: v.z, color: c,
             material: v.material || MaterialType.SOLID,
+            shape: v.shape ?? ShapeType.CUBE,
             vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0,
             rvx: 0, rvy: 0, rvz: 0
         };
     });
 
-    // Group by material
-    const groups: Map<MaterialType, SimulationVoxel[]> = new Map();
+    // Group by chunk and material and shape and decal
+    const groups: Map<string, SimulationVoxel[]> = new Map();
     this.voxels.forEach(v => {
-        if (!groups.has(v.material)) groups.set(v.material, []);
-        groups.get(v.material)!.push(v);
+        const cx = Math.floor(v.x / (CHUNK_SIZE * CONFIG.VOXEL_SIZE));
+        const cy = Math.floor(v.y / (CHUNK_SIZE * CONFIG.VOXEL_SIZE));
+        const cz = Math.floor(v.z / (CHUNK_SIZE * CONFIG.VOXEL_SIZE));
+        const decalFlag = v.isDecal ? 'DECAL' : 'NORMAL';
+        const key = `${cx}_${cy}_${cz}_${v.material}_${v.shape}_${decalFlag}`;
+        v.chunkKey = key;
+        
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(v);
     });
 
-    const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
-
-    groups.forEach((voxels, materialType) => {
+    groups.forEach((voxels, key) => {
         let material: THREE.Material;
+        const keyParts = key.split('_');
+        const materialType = keyParts[3] as MaterialType;
+        const shapeType = keyParts[4] as ShapeType;
+        const isDecal = keyParts[5] === 'DECAL';
         const config = this.materialConfig[materialType] || this.materialConfig[MaterialType.SOLID];
         
         switch (materialType) {
@@ -530,18 +568,26 @@ export class VoxelEngine {
                 material = new THREE.MeshStandardMaterial(config);
         }
 
+        const geometry = this.getGeometryForShape(shapeType, isDecal);
         const mesh = new THREE.InstancedMesh(geometry, material, voxels.length);
+        mesh.frustumCulled = true;
         
         voxels.forEach((v, i) => {
             this.dummy.position.set(v.x, v.y, v.z);
-            this.dummy.rotation.set(v.rx, v.ry, v.rz);
+            if (v.isDecal && v.nx !== undefined && v.ny !== undefined && v.nz !== undefined) {
+                // Point +Z towards the normal, so it sticks on the face.
+                this.dummy.lookAt(v.x + v.nx, v.y + v.ny, v.z + v.nz);
+            } else {
+                this.dummy.rotation.set(v.rx, v.ry, v.rz);
+            }
             this.dummy.updateMatrix();
             mesh.setMatrixAt(i, this.dummy.matrix);
             mesh.setColorAt(i, v.color);
         });
         
+        mesh.computeBoundingSphere();
         this.scene.add(mesh);
-        this.meshGroups.set(materialType, mesh);
+        this.meshGroups.set(key, mesh);
     });
 
     this.draw();
@@ -550,29 +596,38 @@ export class VoxelEngine {
 
   private draw() {
     // Redraw matrix/colors for all groups based on physics simulation
-    // This is less efficient if many materials, but still okay for reasonable voxel counts.
-    const groupIndices: Record<MaterialType, number> = {
-        [MaterialType.SOLID]: 0,
-        [MaterialType.GLASS]: 0,
-        [MaterialType.METAL]: 0,
-        [MaterialType.WOOD]: 0
-    };
+    const groupIndices: Record<string, number> = {};
+    this.meshGroups.forEach((mesh, key) => {
+        groupIndices[key] = 0;
+    });
     
     this.voxels.forEach((v) => {
-        const mesh = this.meshGroups.get(v.material);
-        if (mesh) {
-            const i = groupIndices[v.material]++;
-            this.dummy.position.set(v.x, v.y, v.z);
-            this.dummy.rotation.set(v.rx, v.ry, v.rz);
-            this.dummy.updateMatrix();
-            mesh.setMatrixAt(i, this.dummy.matrix);
-            mesh.setColorAt(i, v.color);
+        const key = v.chunkKey;
+        if (key) {
+           const mesh = this.meshGroups.get(key);
+           if (mesh) {
+               const i = groupIndices[key]++;
+               this.dummy.position.set(v.x, v.y, v.z);
+               if (v.isDecal && v.nx !== undefined && v.ny !== undefined && v.nz !== undefined) {
+                   this.dummy.lookAt(v.x + v.nx, v.y + v.ny, v.z + v.nz);
+               } else {
+                   this.dummy.rotation.set(v.rx, v.ry, v.rz);
+               }
+               this.dummy.updateMatrix();
+               mesh.setMatrixAt(i, this.dummy.matrix);
+               mesh.setColorAt(i, v.color);
+           }
         }
     });
 
     this.meshGroups.forEach(mesh => {
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        
+        // Recompute bounding sphere if things move!
+        if (this.state !== AppState.STABLE) {
+            mesh.computeBoundingSphere();
+        }
     });
   }
 
@@ -877,7 +932,7 @@ export class VoxelEngine {
     this.updatePhysics();
     
     // Optimize: only draw if moving
-    if (this.state !== AppState.STABLE || this.controls.autoRotate) {
+    if (this.state !== AppState.STABLE) {
         this.draw();
     }
     
@@ -960,11 +1015,43 @@ export class VoxelEngine {
       }
   }
 
+  private getGeometryForShape(shape: ShapeType | undefined, isDecal: boolean = false): THREE.BufferGeometry {
+      if (isDecal) {
+          // Decals are thin flat boxes facing +Z by default
+          return new THREE.BoxGeometry(CONFIG.VOXEL_SIZE * 0.95, CONFIG.VOXEL_SIZE * 0.95, 0.05);
+      }
+      switch (shape) {
+          case ShapeType.CYLINDER:
+              return new THREE.CylinderGeometry(CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE, 16);
+          case ShapeType.PYRAMID:
+              return new THREE.ConeGeometry(CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE, 4);
+          case ShapeType.HALF_BLOCK:
+              const half = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE);
+              half.translate(0, -CONFIG.VOXEL_SIZE / 4, 0);
+              return half;
+          case ShapeType.STAIRS:
+              // Simple stairs: 2 steps
+              const g1 = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE);
+              g1.translate(0, -CONFIG.VOXEL_SIZE / 4, 0);
+              const g2 = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE / 2);
+              g2.translate(0, CONFIG.VOXEL_SIZE / 4, -CONFIG.VOXEL_SIZE / 4);
+              // Not easy to merge BufferGeometries in runtime without sub-libraries if they don't share attributes perfectly,
+              // so let's stick to simple geometry for STAIRS or just use a wedge
+              const steps = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
+              // As a quick approximation, we'll return a cube for now for STAIRS to avoid merge issues, 
+              // or use a wedge (a rotated prism). Let's use a wedge.
+              return new THREE.CylinderGeometry(CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE / 2, CONFIG.VOXEL_SIZE, 3);
+          case ShapeType.CUBE:
+          default:
+              return new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
+      }
+  }
+
   public exportGLTF() {
       const exportScene = new THREE.Scene();
-      const geom = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE, CONFIG.VOXEL_SIZE);
       
       this.voxels.forEach(v => {
+          const geom = this.getGeometryForShape(v.shape);
           const mat = new THREE.MeshStandardMaterial({
               color: v.color,
               roughness: this.materialConfig[v.material]?.roughness ?? 0.8,
@@ -996,6 +1083,32 @@ export class VoxelEngine {
           },
           { binary: false }
       );
+  }
+
+  public exportOBJ() {
+      const exportScene = new THREE.Scene();
+      
+      this.voxels.forEach(v => {
+          const geom = this.getGeometryForShape(v.shape);
+          const mat = new THREE.MeshStandardMaterial({ color: v.color });
+          const mesh = new THREE.Mesh(geom, mat);
+          mesh.position.set(v.x, v.y, v.z);
+          mesh.rotation.set(v.rx, v.ry, v.rz);
+          exportScene.add(mesh);
+      });
+
+      const exporter = new OBJExporter();
+      const result = exporter.parse(exportScene);
+      
+      const blob = new Blob([result], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      link.href = url;
+      link.download = 'voxel-model.obj';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   }
 
   public cleanup() {

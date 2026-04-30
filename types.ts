@@ -26,7 +26,16 @@ export enum BrushTool {
   ADD = 'ADD',
   REMOVE = 'REMOVE',
   PAINT = 'PAINT',
-  SCULPT = 'SCULPT'
+  SCULPT = 'SCULPT',
+  DECAL = 'DECAL'
+}
+
+export enum ShapeType {
+  CUBE = 'CUBE',
+  CYLINDER = 'CYLINDER',
+  PYRAMID = 'PYRAMID',
+  HALF_BLOCK = 'HALF_BLOCK',
+  STAIRS = 'STAIRS'
 }
 
 export interface VoxelData {
@@ -35,6 +44,11 @@ export interface VoxelData {
   z: number;
   color: number;
   material?: MaterialType;
+  shape?: ShapeType;
+  isDecal?: boolean;
+  nx?: number;
+  ny?: number;
+  nz?: number;
 }
 
 export interface SimulationVoxel {
@@ -44,6 +58,11 @@ export interface SimulationVoxel {
   z: number;
   color: THREE.Color;
   material: MaterialType;
+  shape: ShapeType;
+  isDecal?: boolean;
+  nx?: number;
+  ny?: number;
+  nz?: number;
   // Physics state
   vx: number;
   vy: number;
@@ -54,6 +73,7 @@ export interface SimulationVoxel {
   rvx: number;
   rvy: number;
   rvz: number;
+  chunkKey?: string;
 }
 
 export interface RebuildTarget {

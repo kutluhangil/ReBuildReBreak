@@ -10,6 +10,7 @@ import { UIOverlay } from './components/UIOverlay';
 import { JsonModal } from './components/JsonModal';
 import { PromptModal } from './components/PromptModal';
 import { BuildEditModal } from './components/BuildEditModal';
+import { SaveBuildModal } from './components/SaveBuildModal';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { Generators } from './utils/voxelGenerators';
 import { AppState, VoxelData, SavedModel, HistoryState, BrushTool, MaterialType } from './types';
@@ -75,6 +76,21 @@ const App: React.FC = () => {
 
   // --- State for Edit Modal ---
   const [editingBuild, setEditingBuild] = useState<SavedModel | null>(null);
+  const [isSavingScene, setIsSavingScene] = useState(false);
+
+  const handleSaveScene = (name: string, folder?: string) => {
+      if (!engineRef.current) return;
+      
+      const newModel: SavedModel = {
+          id: Date.now().toString(),
+          name,
+          folder,
+          voxels: engineRef.current.getData()
+      };
+      
+      setCustomBuilds(prev => [...prev, newModel]);
+      showToast(`Saved "${name}" successfully`);
+  };
 
   const handleSaveBuild = (id: string, newName: string, newFolder?: string) => {
       setCustomBuilds(prev => prev.map(b => b.id === id ? { ...b, name: newName, folder: newFolder } : b));
@@ -545,6 +561,7 @@ const App: React.FC = () => {
         onPromptMorph={() => openPrompt('morph')}
         onShowJson={handleShowJson}
         onImportJson={handleImportClick}
+        onSaveBuild={() => setIsSavingScene(true)}
         onExportGLTF={() => {
             if (engineRef.current) {
                 engineRef.current.exportGLTF();
@@ -559,6 +576,12 @@ const App: React.FC = () => {
 
       {/* Modals & Screens */}
       
+      <SaveBuildModal 
+        isOpen={isSavingScene}
+        onClose={() => setIsSavingScene(false)}
+        onSave={handleSaveScene}
+      />
+
       <BuildEditModal 
         isOpen={editingBuild !== null}
         build={editingBuild}

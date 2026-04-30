@@ -112,12 +112,12 @@ export class VoxelEngine {
     this.controls.autoRotateSpeed = 0.5;
     this.controls.target.set(0, 5, 0);
 
-    // Gizmos
-    this.gravityGizmo = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(-15, 10, -15), 5, 0xff0000, 1.5, 1);
+    // Gizmos (Gravity: Red, Bounce: Green, Friction: Blue) -> refined colors and sizes
+    this.gravityGizmo = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(-15, 10, -15), 5, 0xff3366, 2, 1.5);
     this.scene.add(this.gravityGizmo);
-    this.bounceGizmo = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-12, CONFIG.FLOOR_Y, -15), 5, 0x00ff00, 1.5, 1);
+    this.bounceGizmo = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-12, CONFIG.FLOOR_Y, -15), 5, 0x33cc66, 2, 1.5);
     this.scene.add(this.bounceGizmo);
-    this.frictionGizmo = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(-12, CONFIG.FLOOR_Y + 0.5, -15), 5, 0x0000ff, 1.5, 1);
+    this.frictionGizmo = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(-12, CONFIG.FLOOR_Y + 0.5, -15), 5, 0x3399ff, 2, 1.5);
     this.scene.add(this.frictionGizmo);
 
     // Highlight and Preview Box
@@ -220,15 +220,6 @@ export class VoxelEngine {
       this.camera.position.copy(position);
       this.camera.lookAt(target);
 
-      // Update composer passes
-      if (this.composer) {
-          this.composer.passes.forEach(pass => {
-              if (pass instanceof RenderPass || pass instanceof SSAOPass) {
-                  pass.camera = this.camera;
-              }
-          });
-      }
-      
       // Update controls with new camera
       const damping = this.controls.enableDamping;
       const rotate = this.controls.autoRotate;
@@ -698,9 +689,9 @@ export class VoxelEngine {
     this.frictionGizmo.visible = showGizmos;
     
     if (showGizmos) {
-        this.gravityGizmo.setLength(Math.abs(this.physicsConfig.gravity) * 0.4 || 0.1);
-        this.bounceGizmo.setLength(Math.max(0.1, this.physicsConfig.bounce * 6));
-        this.frictionGizmo.setLength(Math.max(0.1, this.physicsConfig.friction * 6));
+        this.gravityGizmo.setLength(Math.max(0.1, Math.abs(this.physicsConfig.gravity) * 0.4), 2, 1.5);
+        this.bounceGizmo.setLength(Math.max(0.1, this.physicsConfig.bounce * 6), 2, 1.5);
+        this.frictionGizmo.setLength(Math.max(0.1, this.physicsConfig.friction * 6), 2, 1.5);
     }
 
     if (this.state === AppState.DISMANTLING) {
@@ -890,7 +881,7 @@ export class VoxelEngine {
         this.draw();
     }
     
-    this.composer.render();
+    this.renderer.render(this.scene, this.camera);
   }
 
   public handleResize() {
@@ -905,9 +896,6 @@ export class VoxelEngine {
         }
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        if (this.composer) {
-            this.composer.setSize(window.innerWidth, window.innerHeight);
-        }
       }
   }
   

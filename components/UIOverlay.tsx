@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppState, SavedModel, MaterialType, BrushTool, PhysicsConfig, SculptSettings, MaterialConfigMap } from '../types';
 import { Box, Bird, Cat, Rabbit, Users, Code2, Wand2, Hammer, FolderOpen, ChevronUp, FileJson, History as HistoryIcon, Play, Pause, Info, Wrench, Loader2, Undo2, Redo2, Paintbrush, Eraser, Plus, Fingerprint, Grid, FolderPlus, Settings, SlidersHorizontal, Palette, PenLine, Settings2, Trash2, Home, Bot, Trees, Download, Sun, Moon, Sunrise, Camera, Maximize, View } from 'lucide-react';
 import { MaterialPreview } from './MaterialPreview';
+import { CustomColorPicker } from './CustomColorPicker';
 
 interface UIOverlayProps {
   voxelCount: number;
@@ -35,6 +36,7 @@ interface UIOverlayProps {
   onPromptMorph: () => void;
   onShowJson: () => void;
   onImportJson: () => void;
+  onSaveBuild: (name: string, folder?: string) => void;
   onExportGLTF: () => void;
   onResetCamera: () => void;
   onZoomToFit: () => void;
@@ -97,6 +99,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   onPromptMorph,
   onShowJson,
   onImportJson,
+  onSaveBuild,
   onExportGLTF,
   onResetCamera,
   onZoomToFit,
@@ -217,6 +220,9 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 ))}
 
                 {customBuilds.length > 0 && <div className="h-px bg-slate-100 my-1" />}
+
+                <DropdownItem onClick={() => onSaveBuild('Custom Build')} icon={<Plus size={16}/>} label="Save Current Scene" highlight />
+                <div className="h-px bg-slate-100 my-1" />
 
                 <DropdownItem onClick={onImportJson} icon={<FileJson size={16}/>} label="Import JSON" />
                 <DropdownItem onClick={onExportGLTF} icon={<Download size={16}/>} label="Export GLTF" />
@@ -347,13 +353,19 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
             {/* Sculpt Settings */}
             {currentTool === BrushTool.SCULPT && (
-                 <div className="bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl flex flex-col gap-3 border-2 border-slate-200 w-32 mt-2">
-                     <div className="flex flex-col gap-1">
-                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Size</span></div>
+                 <div className="bg-white/90 backdrop-blur p-4 rounded-2xl shadow-xl flex flex-col gap-4 border-2 border-slate-200 w-40 mt-2">
+                     <div className="flex flex-col gap-1 group relative">
+                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase cursor-help" title="Controls the radius of the sculpting brush. A larger size affects more blocks at once.">
+                           <span>Size</span>
+                           <span>{sculptSettings.size}</span>
+                         </div>
                          <input type="range" min="1" max="5" step="0.5" value={sculptSettings.size} onChange={(e) => onSculptSettingsChange({...sculptSettings, size: parseFloat(e.target.value)})} className="accent-sky-500" />
                      </div>
-                     <div className="flex flex-col gap-1">
-                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase"><span>Strength</span></div>
+                     <div className="flex flex-col gap-1 group relative">
+                         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase cursor-help" title="Controls the intensity of the sculpt effect. Higher strength builds or digs faster.">
+                           <span>Strength</span>
+                           <span>{sculptSettings.strength}</span>
+                         </div>
                          <input type="range" min="0.1" max="1" step="0.1" value={sculptSettings.strength} onChange={(e) => onSculptSettingsChange({...sculptSettings, strength: parseFloat(e.target.value)})} className="accent-sky-500" />
                      </div>
                  </div>
@@ -387,16 +399,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                         ))}
                     </div>
                     <div className="mt-2 pt-2 border-t border-slate-200 flex flex-col gap-2">
-                        <div className="flex items-center justify-between gap-2 overflow-hidden bg-white border border-slate-200 rounded-lg pr-2">
-                           <input 
-                               type="color" 
-                               value={currentColor} 
-                               onChange={(e) => onColorChange(e.target.value)}
-                               title="Advanced Color Picker (Native RGB/HSL/Hex)"
-                               className="w-10 h-8 p-0 -ml-2 -my-2 border-0 cursor-pointer shrink-0 bg-transparent"
-                           />
-                           <span className="text-[10px] font-mono text-slate-500 select-all">{currentColor.toUpperCase()}</span>
-                        </div>
+                        <CustomColorPicker color={currentColor} onChange={onColorChange} />
                         <button
                             onClick={() => {
                                 const upperColor = currentColor.toUpperCase();

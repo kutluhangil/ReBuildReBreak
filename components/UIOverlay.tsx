@@ -720,10 +720,15 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
 const ToolButton: React.FC<{icon: React.ReactNode, active: boolean, onClick: () => void, tooltip: string}> = ({icon, active, onClick, tooltip}) => {
     return (
-        <button 
+        <button
             title={tooltip}
             onClick={onClick}
-            className={`p-3 rounded-xl transition-all ${active ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40 scale-105' : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}
+            className={`
+                relative p-2.5 rounded-xl border-2 transition-all duration-150
+                ${active
+                  ? 'bg-slate-900 text-amber-300 border-slate-950 shadow-[0_3px_0_0_rgba(15,23,42,0.2)]'
+                  : 'bg-white text-slate-500 border-slate-900/10 shadow-[0_2px_0_0_rgba(15,23,42,0.06)] hover:border-slate-900/20 hover:text-slate-800'}
+            `}
         >
             {icon}
         </button>
@@ -760,9 +765,14 @@ const MaterialButton: React.FC<{
     }
 
     return (
-        <button 
+        <button
             onClick={onClick}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-all ${active ? 'bg-slate-800 text-white shadow-md scale-105' : 'bg-transparent text-slate-600 hover:bg-slate-100'}`}
+            className={`
+                flex items-center gap-3 px-3 py-2 text-sm font-extrabold rounded-xl border-2 transition-all duration-150
+                ${active
+                  ? 'bg-slate-900 text-white border-slate-950 shadow-[0_2px_0_0_rgba(15,23,42,0.2)]'
+                  : 'bg-transparent text-slate-700 border-transparent hover:bg-slate-100/70 hover:border-slate-900/10'}
+            `}
         >
             {getPreview()}
             {label}
@@ -780,15 +790,7 @@ interface TactileButtonProps {
 }
 
 const TactileButton: React.FC<TactileButtonProps> = ({ onClick, disabled, icon, label, color, compact }) => {
-  const colorStyles = {
-    slate:   'bg-slate-200 text-slate-600 shadow-slate-300 hover:bg-slate-300',
-    rose:    'bg-rose-500 text-white shadow-rose-700 hover:bg-rose-600',
-    sky:     'bg-sky-500 text-white shadow-sky-700 hover:bg-sky-600',
-    emerald: 'bg-emerald-500 text-white shadow-emerald-700 hover:bg-emerald-600',
-    amber:   'bg-amber-400 text-amber-900 shadow-amber-600 hover:bg-amber-500',
-    indigo:  'bg-indigo-500 text-white shadow-indigo-700 hover:bg-indigo-600',
-    purple:  'bg-purple-500 text-white shadow-purple-700 hover:bg-purple-600'
-  };
+  const isActive = color !== 'slate';
 
   return (
     <button
@@ -796,29 +798,41 @@ const TactileButton: React.FC<TactileButtonProps> = ({ onClick, disabled, icon, 
       disabled={disabled}
       title={label}
       className={`
-        group relative flex items-center justify-center gap-2 rounded-xl font-bold text-sm transition-all duration-100
-        border-b-[4px] active:border-b-0 active:translate-y-[4px]
-        ${compact ? 'p-2.5' : 'px-4 py-3'}
-        ${disabled 
-          ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed shadow-none' 
-          : `${colorStyles[color]} border-black/20 shadow-lg`}
+        group relative flex items-center justify-center gap-2 rounded-xl font-extrabold text-sm transition-all duration-150
+        border-2 border-b-[4px] active:translate-y-[2px] active:border-b-2
+        ${compact ? 'p-2.5' : 'px-4 py-2.5'}
+        ${disabled
+          ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
+          : isActive
+            ? 'bg-slate-900 text-white border-slate-950 shadow-[0_4px_0_0_rgba(15,23,42,0.2)] hover:bg-slate-800'
+            : 'bg-white text-slate-700 border-slate-900/10 shadow-[0_4px_0_0_rgba(15,23,42,0.08)] hover:border-slate-900/20 hover:-translate-y-0.5'}
       `}
     >
-      {icon}
-      {!compact && <span>{label}</span>}
+      <span className={isActive ? 'text-amber-300' : 'text-slate-500'}>{icon}</span>
+      {!compact && <span className="tracking-tight">{label}</span>}
     </button>
   );
 };
 
-const BigActionButton: React.FC<{onClick: () => void, icon: React.ReactNode, label: string, color: 'rose'}> = ({ onClick, icon, label, color }) => {
+const BigActionButton: React.FC<{onClick: () => void, icon: React.ReactNode, label: string, color: 'rose'}> = ({ onClick, icon, label }) => {
     return (
-        <button 
+        <button
             onClick={onClick}
             title={label}
-            className="group relative flex flex-col items-center justify-center w-32 h-32 rounded-3xl bg-rose-500 hover:bg-rose-600 text-white shadow-xl shadow-rose-900/30 border-b-[8px] border-rose-800 active:border-b-0 active:translate-y-[8px] transition-all duration-150"
+            className="
+              group relative flex flex-col items-center justify-center w-32 h-32 rounded-3xl
+              bg-slate-900 text-white
+              border-2 border-b-[8px] border-slate-950
+              shadow-[0_10px_0_0_rgba(15,23,42,0.22)]
+              hover:bg-slate-800
+              active:translate-y-[4px] active:border-b-[4px] active:shadow-[0_6px_0_0_rgba(15,23,42,0.22)]
+              transition-all duration-150
+            "
         >
-            <div className="mb-2">{icon}</div>
-            <div className="text-sm font-black tracking-wider">{label}</div>
+            <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center mb-2 shadow-[inset_0_-3px_0_0_rgba(0,0,0,0.18)]">
+                {icon}
+            </div>
+            <div className="text-xs font-black tracking-[0.22em] text-amber-300">{label}</div>
         </button>
     )
 }
@@ -846,27 +860,27 @@ const DropdownMenu: React.FC<DropdownProps> = ({ icon, label, children, color, d
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const bgClass = color === 'indigo' ? 'bg-indigo-500 hover:bg-indigo-600 border-indigo-800' : 'bg-emerald-500 hover:bg-emerald-600 border-emerald-800';
-
     return (
         <div className="relative" ref={menuRef}>
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={`
-                    flex items-center gap-2 font-bold text-white shadow-lg rounded-2xl transition-all active:scale-95
-                    ${bgClass}
-                    ${big ? 'px-8 py-4 text-lg border-b-[6px] active:border-b-0 active:translate-y-[6px]' : 'px-4 py-3 text-sm border-b-[4px] active:border-b-0 active:translate-y-[4px]'}
+                    relative flex items-center gap-2 font-extrabold rounded-2xl transition-all duration-150
+                    bg-slate-900 text-white border-2 border-slate-950 hover:bg-slate-800
+                    ${big
+                      ? 'px-7 py-4 text-base border-b-[6px] shadow-[0_8px_0_0_rgba(15,23,42,0.22)] active:translate-y-[3px] active:border-b-[3px] active:shadow-[0_5px_0_0_rgba(15,23,42,0.22)]'
+                      : 'px-4 py-2.5 text-sm border-b-[4px] shadow-[0_4px_0_0_rgba(15,23,42,0.2)] active:translate-y-[2px] active:border-b-2 active:shadow-[0_2px_0_0_rgba(15,23,42,0.2)]'}
                 `}
             >
-                {icon}
-                {label}
-                <ChevronUp size={16} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} ${direction === 'down' ? 'rotate-180' : ''}`} />
+                <span className="text-amber-300">{icon}</span>
+                <span className="tracking-tight">{label}</span>
+                <ChevronUp size={14} className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} ${direction === 'down' ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
                 <div className={`
-                    absolute left-0 ${direction === 'up' ? 'bottom-full mb-3' : 'top-full mt-3'} 
-                    w-56 max-h-[60vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border-2 border-slate-100 p-2 flex flex-col gap-1 animate-in fade-in zoom-in duration-200 z-50
+                    absolute left-0 ${direction === 'up' ? 'bottom-full mb-3' : 'top-full mt-3'}
+                    w-60 max-h-[60vh] overflow-y-auto bg-white rounded-2xl border-2 border-slate-900/10 shadow-[0_8px_0_0_rgba(15,23,42,0.08)] p-2 flex flex-col gap-1 animate-in fade-in zoom-in duration-200 z-50
                 `}>
                     {children}
                 </div>
@@ -878,25 +892,25 @@ const DropdownMenu: React.FC<DropdownProps> = ({ icon, label, children, color, d
 const DropdownItem: React.FC<{ onClick: () => void, onEdit?: (e: React.MouseEvent) => void, icon: React.ReactNode, label: string, highlight?: boolean, truncate?: boolean }> = ({ onClick, onEdit, icon, label, highlight, truncate }) => {
     return (
         <div className="relative group">
-            <button 
+            <button
                 onClick={onClick}
                 className={`
-                    w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-colors text-left
-                    ${highlight 
-                        ? 'bg-gradient-to-r from-sky-50 to-blue-50 text-sky-600 hover:from-sky-100 hover:to-blue-100' 
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-extrabold transition-colors text-left
+                    ${highlight
+                        ? 'bg-amber-50 text-slate-900 border border-amber-200 hover:bg-amber-100'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-transparent'}
                 `}
             >
-                <div className="shrink-0">{icon}</div>
-                <span className={truncate ? "truncate w-[80%] block overflow-hidden text-ellipsis whitespace-nowrap" : "w-full block"}>{label}</span>
+                <div className={`shrink-0 ${highlight ? 'text-amber-600' : 'text-slate-400'}`}>{icon}</div>
+                <span className={truncate ? "truncate w-[80%] block overflow-hidden text-ellipsis whitespace-nowrap tracking-tight" : "w-full block tracking-tight"}>{label}</span>
             </button>
             {onEdit && (
                 <button
                     onClick={onEdit}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all bg-white shadow-sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-900 hover:bg-amber-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all bg-white border border-slate-900/10 shadow-sm"
                     title="Edit build"
                 >
-                    <PenLine size={14} />
+                    <PenLine size={13} />
                 </button>
             )}
         </div>

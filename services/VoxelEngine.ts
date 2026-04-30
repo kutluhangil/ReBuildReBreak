@@ -95,9 +95,9 @@ export class VoxelEngine {
     // Init Three.js
     this.scene = new THREE.Scene();
     
-    // Basic Background
-    this.scene.background = new THREE.Color(0xf1f5f9);
-    this.scene.fog = new THREE.Fog(0xf1f5f9, 50, 150);
+    // Basic Background — matches landing-page cream
+    this.scene.background = new THREE.Color(0xfff7ec);
+    this.scene.fog = new THREE.Fog(0xfff7ec, 50, 150);
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     // Slightly zoomed out start position
@@ -983,14 +983,14 @@ export class VoxelEngine {
   public setEnvironment(env: 'day' | 'night' | 'sunset') {
       switch (env) {
           case 'day':
-              this.scene.background = new THREE.Color(0xf1f5f9);
-              this.scene.fog = new THREE.Fog(0xf1f5f9, 50, 150);
+              this.scene.background = new THREE.Color(0xfff7ec);
+              this.scene.fog = new THREE.Fog(0xfff7ec, 50, 150);
               this.ambientLight.color.setHex(0xffffff);
-              this.ambientLight.intensity = 0.7;
+              this.ambientLight.intensity = 0.75;
               this.dirLight.color.setHex(0xffffff);
               this.dirLight.intensity = 1.5;
               this.dirLight.position.set(50, 80, 30);
-              (this.floorMesh.material as THREE.MeshStandardMaterial).color.setHex(0xe2e8f0);
+              (this.floorMesh.material as THREE.MeshStandardMaterial).color.setHex(0xfde6c8);
               break;
           case 'night':
               this.scene.background = new THREE.Color(0x0f172a);

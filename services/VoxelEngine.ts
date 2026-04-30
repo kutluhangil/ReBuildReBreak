@@ -23,7 +23,7 @@ export class VoxelEngine {
   private isOrthographic: boolean = false;
   private renderer: THREE.WebGLRenderer;
   public controls: OrbitControls;
-  private meshGroups: Map<MaterialType, THREE.InstancedMesh> = new Map();
+  private meshGroups: Map<string, THREE.InstancedMesh> = new Map();
   private dummy = new THREE.Object3D();
   
   private ambientLight!: THREE.AmbientLight;
@@ -260,7 +260,7 @@ export class VoxelEngine {
       mesh.getMatrixAt(instanceId, matrix);
       const pos = new THREE.Vector3().setFromMatrixPosition(matrix);
 
-      const materialTypeStr = Array.from(this.meshGroups.entries()).find(([k, v]) => v === mesh)?.[0];
+      const materialTypeStr = Array.from(this.meshGroups.entries()).find(([k, v]) => v === mesh)?.[0].split('_')[3] as MaterialType;
       if (this.onHoverChange) {
          this.onHoverChange(materialTypeStr ? { x: Math.round(pos.x), y: Math.round(pos.y), z: Math.round(pos.z), material: materialTypeStr } : null);
       }
@@ -494,6 +494,8 @@ export class VoxelEngine {
     });
     this.meshGroups.clear();
 
+    const CHUNK_SIZE = 16;
+    
     this.voxels = data.map((v, i) => {
         const c = new THREE.Color(v.color);
         // Slight color variation for realism
@@ -507,17 +509,24 @@ export class VoxelEngine {
         };
     });
 
-    // Group by material
-    const groups: Map<MaterialType, SimulationVoxel[]> = new Map();
+    // Group by chunk and material
+    const groups: Map<string, SimulationVoxel[]> = new Map();
     this.voxels.forEach(v => {
-        if (!groups.has(v.material)) groups.set(v.material, []);
-        groups.get(v.material)!.push(v);
+        const cx = Math.floor(v.x / (CHUNK_SIZE * CONFIG.VOXEL_SIZE));
+        const cy = Math.floor(v.y / (CHUNK_SIZE * CONFIG.VOXEL_SIZE));
+        const cz = Math.floor(v.z / (CHUNK_SIZE * CONFIG.VOXEL_SIZE));
+        const key = `${cx}_${cy}_${cz}_${v.material}`;
+        v.chunkKey = key;
+        
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(v);
     });
 
     const geometry = new THREE.BoxGeometry(CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05, CONFIG.VOXEL_SIZE - 0.05);
 
-    groups.forEach((voxels, materialType) => {
+    groups.forEach((voxels, key) => {
         let material: THREE.Material;
+        const materialType = key.split('_')[3] as MaterialType;
         const config = this.materialConfig[materialType] || this.materialConfig[MaterialType.SOLID];
         
         switch (materialType) {
@@ -531,6 +540,7 @@ export class VoxelEngine {
         }
 
         const mesh = new THREE.InstancedMesh(geometry, material, voxels.length);
+        mesh.frustumCulled = true;
         
         voxels.forEach((v, i) => {
             this.dummy.position.set(v.x, v.y, v.z);
@@ -540,8 +550,9 @@ export class VoxelEngine {
             mesh.setColorAt(i, v.color);
         });
         
+        mesh.computeBoundingSphere();
         this.scene.add(mesh);
-        this.meshGroups.set(materialType, mesh);
+        this.meshGroups.set(key, mesh);
     });
 
     this.draw();
@@ -550,29 +561,34 @@ export class VoxelEngine {
 
   private draw() {
     // Redraw matrix/colors for all groups based on physics simulation
-    // This is less efficient if many materials, but still okay for reasonable voxel counts.
-    const groupIndices: Record<MaterialType, number> = {
-        [MaterialType.SOLID]: 0,
-        [MaterialType.GLASS]: 0,
-        [MaterialType.METAL]: 0,
-        [MaterialType.WOOD]: 0
-    };
+    const groupIndices: Record<string, number> = {};
+    this.meshGroups.forEach((mesh, key) => {
+        groupIndices[key] = 0;
+    });
     
     this.voxels.forEach((v) => {
-        const mesh = this.meshGroups.get(v.material);
-        if (mesh) {
-            const i = groupIndices[v.material]++;
-            this.dummy.position.set(v.x, v.y, v.z);
-            this.dummy.rotation.set(v.rx, v.ry, v.rz);
-            this.dummy.updateMatrix();
-            mesh.setMatrixAt(i, this.dummy.matrix);
-            mesh.setColorAt(i, v.color);
+        const key = v.chunkKey;
+        if (key) {
+           const mesh = this.meshGroups.get(key);
+           if (mesh) {
+               const i = groupIndices[key]++;
+               this.dummy.position.set(v.x, v.y, v.z);
+               this.dummy.rotation.set(v.rx, v.ry, v.rz);
+               this.dummy.updateMatrix();
+               mesh.setMatrixAt(i, this.dummy.matrix);
+               mesh.setColorAt(i, v.color);
+           }
         }
     });
 
     this.meshGroups.forEach(mesh => {
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        
+        // Recompute bounding sphere if things move!
+        if (this.state !== AppState.STABLE) {
+            mesh.computeBoundingSphere();
+        }
     });
   }
 
@@ -877,7 +893,7 @@ export class VoxelEngine {
     this.updatePhysics();
     
     // Optimize: only draw if moving
-    if (this.state !== AppState.STABLE || this.controls.autoRotate) {
+    if (this.state !== AppState.STABLE) {
         this.draw();
     }
     

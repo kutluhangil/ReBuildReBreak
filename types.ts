@@ -54,6 +54,7 @@ export interface SimulationVoxel {
   rvx: number;
   rvy: number;
   rvz: number;
+  chunkKey?: string;
 }
 
 export interface RebuildTarget {

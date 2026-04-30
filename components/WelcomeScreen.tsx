@@ -153,7 +153,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
                 </div>
              </div>
           </div>
-
       </div>
       <style>{`
         .perspective-\\[1200px\\] { perspective: 1200px; }

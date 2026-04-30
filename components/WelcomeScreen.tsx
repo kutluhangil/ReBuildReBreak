@@ -15,15 +15,15 @@ interface WelcomeScreenProps {
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss }) => {
-  const [mounted, setMounted] = useState(false);
+  const [contentIn, setContentIn] = useState(false);
   const { lang, setLang, t } = useLanguage();
 
   useEffect(() => {
     if (visible) {
-      const id = window.setTimeout(() => setMounted(true), 60);
-      return () => window.clearTimeout(id);
+      const id = window.requestAnimationFrame(() => setContentIn(true));
+      return () => window.cancelAnimationFrame(id);
     }
-    setMounted(false);
+    setContentIn(false);
   }, [visible]);
 
   if (!visible) return null;
@@ -36,12 +36,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
 
   return (
     <div
-      className={`
-        fixed inset-0 z-[100] w-full h-full overflow-hidden
-        text-[#f1ede4] bg-[#0b0b0c]
-        transition-opacity duration-700 ease-out
-        ${mounted ? 'opacity-100' : 'opacity-0'}
-      `}
+      className="fixed inset-0 z-[100] w-full h-full overflow-hidden text-[#f1ede4] bg-[#0b0b0c]"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {/* Subtle film grain + vignette */}
@@ -72,7 +67,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
       <div className={`
           relative z-10 h-full w-full flex flex-col
           transition-all duration-1000 ease-out
-          ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}
+          ${contentIn ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}
         `}>
 
         {/* Top bar */}
@@ -188,6 +183,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ visible, onDismiss
             </div>
           </div>
 
+          <div className="text-[10px] tracking-[0.32em] uppercase text-[#f1ede4]/30 font-mono text-right">
+            <div>v.01</div>
+            <div className="mt-1">Voxel · Physics · Gemini</div>
+          </div>
+        </footer>
       </div>
     </div>
   );

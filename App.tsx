@@ -13,7 +13,7 @@ import { BuildEditModal } from './components/BuildEditModal';
 import { SaveBuildModal } from './components/SaveBuildModal';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { Generators } from './utils/voxelGenerators';
-import { AppState, VoxelData, SavedModel, HistoryState, BrushTool, MaterialType } from './types';
+import { AppState, VoxelData, SavedModel, HistoryState, BrushTool, MaterialType, ShapeType } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { audioService } from './services/AudioService';
 
@@ -23,6 +23,7 @@ const App: React.FC = () => {
   
   const [appState, setAppState] = useState<AppState>(AppState.STABLE);
   const [voxelCount, setVoxelCount] = useState<number>(0);
+  const [currentShape, setCurrentShape] = useState<ShapeType>(ShapeType.CUBE);
   
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
   const [jsonModalMode, setJsonModalMode] = useState<'view' | 'import'>('view');
@@ -199,8 +200,9 @@ const App: React.FC = () => {
           engineRef.current.currentTool = currentTool;
           engineRef.current.currentColor = parseInt(currentColor.replace('#', ''), 16);
           engineRef.current.currentMaterial = currentMaterial;
+          engineRef.current.currentShape = currentShape;
       }
-  }, [currentTool, currentColor, currentMaterial]);
+  }, [currentTool, currentColor, currentMaterial, currentShape]);
 
   // Sync Sculpting
   useEffect(() => {
@@ -525,6 +527,7 @@ const App: React.FC = () => {
         currentTool={currentTool}
         currentColor={currentColor}
         currentMaterial={currentMaterial}
+        currentShape={currentShape}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         gridSnapping={gridSnapping}
@@ -536,6 +539,7 @@ const App: React.FC = () => {
         onToolChange={setCurrentTool}
         onColorChange={setCurrentColor}
         onMaterialChange={setCurrentMaterial}
+        onShapeChange={setCurrentShape}
         hoveredVoxel={hoveredVoxel}
         onGridSnapToggle={() => setGridSnapping(g => !g)}
         onPhysicsConfigChange={setPhysicsConfig}
@@ -565,6 +569,11 @@ const App: React.FC = () => {
         onExportGLTF={() => {
             if (engineRef.current) {
                 engineRef.current.exportGLTF();
+            }
+        }}
+        onExportOBJ={() => {
+            if (engineRef.current) {
+                engineRef.current.exportOBJ();
             }
         }}
         onResetCamera={() => engineRef.current?.resetCamera()}
